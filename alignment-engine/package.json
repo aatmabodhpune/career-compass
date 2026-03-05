@@ -1,0 +1,17 @@
+{
+  "name": "alignment-engine",
+  "version": "1.0.0",
+  "description": "Career alignment scoring engine",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@google-cloud/functions-framework": "^3.4.2"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.2",
+    "@types/node": "^22.5.4"
+  }
+}
