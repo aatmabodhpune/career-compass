@@ -1,21 +1,20 @@
-import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { LoginPage } from './pages/LoginPage';
-import { JoinPage } from './pages/JoinPage';
-import { AssessmentPage } from './pages/AssessmentPage';
-import { ResultsPage } from './pages/ResultsPage';
-import { AdminDashboard } from './pages/AdminDashboard';
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import Login from "./pages/Login";
+import Dashboard from "./pages/Dashboard";
+import ProtectedRoute from "./components/ProtectedRoute";
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Navigate to="/login" replace />} />
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/join/:inviteToken" element={<JoinPage />} />
-        <Route path="/assessment" element={<AssessmentPage />} />
-        <Route path="/results" element={<ResultsPage />} />
-        <Route path="/admin" element={<AdminDashboard />} />
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/login" element={<Login />} />
+
+        <Route element={<ProtectedRoute />}>
+          <Route path="/dashboard" element={<Dashboard />} />
+        </Route>
+
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </BrowserRouter>
   );
