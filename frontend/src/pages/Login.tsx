@@ -1,7 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../store/authStore";
 import { loginWithToken } from "../api/auth";
+import { Container } from "../components/ui/Container";
+import { Card } from "../components/ui/Card";
+import { Button } from "../components/ui/Button";
+import { useAssessmentStore } from "../store/assessmentStore";
 
 export default function Login() {
     const [token, setToken] = useState("");
@@ -9,7 +13,16 @@ export default function Login() {
     const [error, setError] = useState<string | null>(null);
 
     const setStudent = useAuthStore((state) => state.setStudent);
+    const setStoreToken = useAuthStore((state) => state.setToken);
+    const { token: activeToken, _hasHydrated } = useAuthStore();
     const navigate = useNavigate();
+
+    // 🔴 4. FIX LOGIN FLOW - Bounce authenticated users directly dynamically bypassing login wall
+    useEffect(() => {
+        if (_hasHydrated && activeToken) {
+            navigate("/", { replace: true });
+        }
+    }, [activeToken, _hasHydrated, navigate]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -26,49 +39,54 @@ export default function Login() {
 
             if (data.error) {
                 setError(data.error);
-            } else {
-                setStudent(data.data);
-                navigate("/dashboard", { replace: true });
+                return;
             }
-        } catch (err) {
-            if (err instanceof Error) {
-                setError(err.message);
-            } else {
-                setError("Failed to connect. Please check your network.");
+
+            if (data.student) {
+                setStudent(data.student);
             }
+
+            // Ensure previous assessment session state is fully cleared on new login
+            useAssessmentStore.getState().resetAssessment();
+
+            setStoreToken(token);
+            navigate("/", { replace: true });
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <div className="flex items-center justify-center min-h-screen bg-gray-50">
-            <div className="bg-white p-8 rounded-xl shadow-md max-w-sm w-full">
-                <h1 className="text-2xl font-bold text-center text-gray-900 mb-2">Career Compass</h1>
-                <p className="text-center text-gray-500 mb-6">Enter your access token</p>
-
-                <form onSubmit={handleSubmit} className="space-y-4">
+        <Container>
+            <div className="flex items-center justify-center min-h-[60vh]">
+                <Card variant="centered" className="space-y-6">
                     <div>
-                        <input
-                            type="text"
-                            value={token}
-                            onChange={(e) => setToken(e.target.value)}
-                            placeholder="Enter token"
-                            disabled={loading}
-                            className="w-full border border-gray-300 rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
-                        />
-                        {error && <p className="mt-2 text-sm text-red-500">{error}</p>}
+                        <h1 className="text-2xl font-bold text-gray-900 mb-1">Career Compass</h1>
+                        <p className="text-sm text-gray-500">Enter your access token to begin.</p>
                     </div>
-
-                    <button
-                        type="submit"
-                        disabled={loading}
-                        className="w-full bg-blue-600 text-white rounded py-2 hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        {loading ? "Loading..." : "Submit"}
-                    </button>
-                </form>
+                    <form onSubmit={handleSubmit} className="space-y-4 text-left">
+                        <div className="space-y-1">
+                            <label className="text-sm text-gray-500">Access token</label>
+                            <input
+                                type="text"
+                                value={token}
+                                onChange={(e) => setToken(e.target.value)}
+                                placeholder="Enter token"
+                                disabled={loading}
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent text-gray-800"
+                            />
+                            {error && <p className="text-sm text-red-500">{error}</p>}
+                        </div>
+                        <Button
+                            type="submit"
+                            disabled={loading}
+                            className="w-full justify-center"
+                        >
+                            {loading ? "Loading..." : "Submit"}
+                        </Button>
+                    </form>
+                </Card>
             </div>
-        </div>
+        </Container>
     );
 }
