@@ -227,13 +227,17 @@ export const questions: Question[] = [
     }))
 ];
 
+// ⚠️ DEV MODE ONLY
+// Reduced questions for testing
+// TODO: Restore full dataset before production
+
 // DERIVED HELPERS
-export const personalityQuestions = questions.filter(q => q.section === "personality");
-export const interestQuestions = questions.filter(q => q.section === "interest");
-export const aptitudeQuestions = questions.filter(q => q.section === "aptitude");
+export const personalityQuestions = questions.filter(q => q.section === "personality").slice(0, 5);
+export const interestQuestions = questions.filter(q => q.section === "interest").slice(0, 5);
+export const aptitudeQuestions = questions.filter(q => q.section === "aptitude").slice(0, 5);
 
 // COUNTS
-export const TOTAL_QUESTIONS = questions.length;
 export const TOTAL_PERSONALITY = personalityQuestions.length;
 export const TOTAL_INTEREST = interestQuestions.length;
 export const TOTAL_APTITUDE = aptitudeQuestions.length;
+export const TOTAL_QUESTIONS = TOTAL_PERSONALITY + TOTAL_INTEREST + TOTAL_APTITUDE;

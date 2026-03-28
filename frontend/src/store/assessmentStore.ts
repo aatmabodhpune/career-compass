@@ -9,6 +9,7 @@ interface AssessmentState {
     currentQuestionIndex: number;
     responses: Record<string, any>;
     isSubmitting: boolean;
+    error: string | null;
 
     startSession: (token: string) => Promise<void>;
     updateResponse: (questionId: string, value: string | number) => void;
@@ -28,6 +29,7 @@ export const useAssessmentStore = create<AssessmentState>((set, get) => ({
     currentQuestionIndex: 0,
     responses: {},
     isSubmitting: false,
+    error: null,
 
     setSection: (section) => set({ section }),
     setCurrentQuestionIndex: (currentQuestionIndex) => set({ currentQuestionIndex }),
@@ -44,6 +46,7 @@ export const useAssessmentStore = create<AssessmentState>((set, get) => ({
             currentQuestionIndex: 0,
             responses: {},
             isSubmitting: false,
+            error: null,
         });
     },
 
@@ -83,12 +86,19 @@ export const useAssessmentStore = create<AssessmentState>((set, get) => ({
         // Prevent UI responses if completed
         if (status === 'completed') return;
 
-        console.log("Updating:", questionId, value);
+        // Extract strict mathematical integer conversions isolating specifically bounded Aptitude mapping logic natively preventing database format exceptions downstream cleanly.
+        let finalValue = value;
+        if (questionId.startsWith('a') && typeof value === 'string') {
+            const map: Record<string, number> = { A: 1, B: 2, C: 3, D: 5 };
+            finalValue = map[value.toUpperCase()] || value;
+        }
+
+        console.log("Updating:", questionId, finalValue);
 
         set((state) => ({
             responses: {
                 ...state.responses,
-                [questionId]: value,
+                [questionId]: finalValue,
             },
         }));
 
@@ -115,8 +125,21 @@ export const useAssessmentStore = create<AssessmentState>((set, get) => ({
                 if (!currentToken || !currentState.session_id) return;
 
                 console.log("Saving responses:", currentState.responses);
-                // Use latest responses from Zustand to avoid stale payloads.
-                await assessmentApi.saveResponses(currentToken, currentState.session_id, currentState.responses);
+                
+                // FINAL SAFETY TRANSFORM (MANDATORY) ensuring backend strictly receives expected integers
+                const transformedResponses: Record<string, any> = {};
+                for (const key in currentState.responses) {
+                    const value = currentState.responses[key];
+                    if (key.startsWith("a") && typeof value === "string") {
+                        const map: Record<string, number> = { A: 1, B: 2, C: 3, D: 5 };
+                        transformedResponses[key] = map[value.toUpperCase()] || value;
+                    } else {
+                        transformedResponses[key] = value;
+                    }
+                }
+
+                // Use strictly transformed parameters to avoid explicit database failure bounds globally
+                await assessmentApi.saveResponses(currentToken, currentState.session_id, transformedResponses);
             } catch (err) {
                 console.error("Autosave Error:", err);
             }
@@ -129,7 +152,30 @@ export const useAssessmentStore = create<AssessmentState>((set, get) => ({
         // 1. PREVENT DOUBLE SUBMIT (CRITICAL)
         if (state.isSubmitting) return;
 
-        set({ isSubmitting: true });
+        // COUNT VALIDATION (MANDATORY)
+        const REQUIRED = {
+            personality: 5,
+            interest: 5,
+            aptitude: 5
+        };
+
+        const responses = state.responses;
+        const personalityCount = Object.keys(responses).filter(k => k.startsWith("p")).length;
+        const interestCount = Object.keys(responses).filter(k => k.startsWith("i")).length;
+        const aptitudeCount = Object.keys(responses).filter(k => k.startsWith("a")).length;
+
+        if (
+            personalityCount < REQUIRED.personality ||
+            interestCount < REQUIRED.interest ||
+            aptitudeCount < REQUIRED.aptitude
+        ) {
+            set({
+                error: "Please complete all questions before submitting."
+            });
+            return;
+        }
+
+        set({ isSubmitting: true, error: null });
 
         // 2. CANCEL AUTOSAVE ON SUBMIT (CRITICAL)
         if (saveTimeout !== null) {

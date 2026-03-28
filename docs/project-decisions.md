@@ -21,3 +21,18 @@
 - Autosave sends the FULL `responses` object.
 - Autosave payload is always derived from the latest Zustand state at execution time (no stale local copies).
 - Autosave is debounced at `1000ms` to reduce redundant network calls.
+
+## Alignment Engine (Sprint 3 & 3.5)
+
+✔ Prefix-based classification (p*, i*, a*)
+✔ Global benchmarks (no school_id)
+✔ Benchmark stored as JSONB (`benchmark_scores`)
+✔ Supabase Edge Functions over GCF
+✔ Frontend is dumb renderer (no logic)
+✔ Zustand as single source of truth
+✔ Aptitude mapping handled in normalizer layer
+
+⚠️ **Pending Decision:**
+- Backend sorting not implemented yet
+
+⚠️ GLOBAL NOTE: Sorting of results is pending. Backend currently returns unsorted arrays. This will be implemented before production.

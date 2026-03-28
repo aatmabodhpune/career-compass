@@ -42,3 +42,31 @@ Behavior:
 Response:
 - `{ data: <backend payload>, error: null }` on success
 - `{ data: null, error: <message> }` on failure
+
+## POST /compute-alignment
+
+Request:
+```json
+{
+  "session_id": "uuid"
+}
+```
+
+Response:
+```json
+{
+  "data": {
+    "overall_top_10": [...],
+    "personality_top_10": [...],
+    "interest_top_10": [...],
+    "aptitude_top_10": [...]
+  },
+  "error": null
+}
+```
+
+**Notes:**
+- Arrays currently NOT sorted (IMPORTANT)
+- Sorting will be handled in backend (pending)
+
+⚠️ GLOBAL NOTE: Sorting of results is pending. Backend currently returns unsorted arrays. This will be implemented before production.

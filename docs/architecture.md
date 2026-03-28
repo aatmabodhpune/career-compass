@@ -5,14 +5,28 @@ This document describes the high-level architecture of the Career Compass platfo
 ## Components
 - **Frontend:** React + Vite + TypeScript
 - **Backend / Data:** Supabase (Auth, Postgres, Storage)
-- **APIs:** Supabase Edge Functions
-- **Alignment Engine:** Google Cloud Functions (Node.js)
+- **APIs:** Supabase Edge Functions (Deno runtime)
+  - Modular structure: `controller → service → repository → modules`
+- **Alignment Engine:** Supabase Edge Functions (Migrated from Google Cloud Functions)
+
+## Alignment Engine Flow
+
+Assessment → Responses (JSONB)
+→ Prefix Classification (p*, i*, a*)
+→ Normalization
+→ Scoring
+→ Ranking
+→ Storage (alignment_results)
+→ API Response
+→ Frontend Rendering
 
 ## Frontend Architecture
 
 The frontend follows a simple request / state flow:
 
-UI → Zustand Store → API Layer → Supabase Edge Functions → PostgreSQL (JSONB)
+UI → Zustand Store → API Layer → Supabase Edge Functions → DB
+
+⚠️ GLOBAL NOTE: Sorting of results is pending. Backend currently returns unsorted arrays. This will be implemented before production.
 
 - Zustand is the single source of truth for the active assessment state (session id, status, section, responses).
 - The UI reads only from Zustand state and triggers state updates via store actions.
