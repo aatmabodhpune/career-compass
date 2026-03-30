@@ -48,7 +48,9 @@ Response:
 Request:
 ```json
 {
-  "session_id": "uuid"
+  "session_id": "uuid",
+  "user_id": "uuid",
+  "school_id": "uuid"
 }
 ```
 
@@ -56,17 +58,42 @@ Response:
 ```json
 {
   "data": {
-    "overall_top_10": [...],
-    "personality_top_10": [...],
-    "interest_top_10": [...],
-    "aptitude_top_10": [...]
+    "overall_top_10": [],
+    "personality_top_10": [],
+    "interest_top_10": [],
+    "aptitude_top_10": [],
+    "insights": {
+      "strengths": [],
+      "weaknesses": [],
+      "recommendations": []
+    },
+    "career_details": [],
+    "report": {
+      "url": null
+    }
   },
   "error": null
 }
 ```
 
 **Notes:**
-- Arrays currently NOT sorted (IMPORTANT)
-- Sorting will be handled in backend (pending)
+- `report.url` will be `null` until PDF generation is implemented.
+- Arrays currently **NOT sorted** (sorting pending before production).
+- Controller validates `session_id`, `user_id`, `school_id` before calling service.
+- DB session validation: session must exist, `student_id` must match `user_id`, `school_id` must match, and `status` must be `"completed"`.
+- Specific error messages returned per failure: `"Session not found"`, `"Unauthorized"`, `"Assessment not completed"`.
+- `insights` and `career_details` default to empty structures if insight engine fails (non-blocking).
 
 ⚠️ GLOBAL NOTE: Sorting of results is pending. Backend currently returns unsorted arrays. This will be implemented before production.
+
+---
+### Sprint 4 Addition — Frontend Compute Alignment Request
+
+The frontend sends a request body containing ONLY `session_id`:
+
+```json
+{ "session_id": "uuid" }
+```
+
+⚠️ Sorting not implemented yet
+⚠️ Arrays returned unsorted (pre-production fix required)

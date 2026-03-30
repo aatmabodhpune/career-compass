@@ -20,6 +20,14 @@ export function rankAptitude(scores: CareerScore[]): CareerScore[] {
 }
 
 export function rankAll(scores: CareerScore[]): RankedResults {
+    console.log("🔥 rankAll INPUT:", scores);
+    console.log("🔥 TYPE:", typeof scores);
+    console.log("🔥 IS ARRAY:", Array.isArray(scores));
+
+    if (!Array.isArray(scores)) {
+        throw new Error("rankAll received non-array input");
+    }
+
     const rawOverall = rankOverall(scores);
     console.log("OVERALL BEFORE SORT", rawOverall);
 

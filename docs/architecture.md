@@ -59,3 +59,76 @@ Typography scale used across the MVP:
 - Label: `text-sm text-gray-500`
 
 Progress bar uses a simple bar layout with `h-2`, `bg-gray-200` track, and `bg-blue-600` filled portion.
+
+---
+
+## Alignment Engine — Final Flow (Sprint 4)
+
+```
+responses
+→ normalizeAll        (trait values → 0-100 scale)
+→ computeAllScores    (key mapping + dot-product scoring)
+→ rankAll             (top 10 per category + overall)
+→ insight engine      (explanations, strengths, recommendations)
+→ API response
+```
+
+**Contract Notes:**
+- `computeAllScores` enforces ARRAY output — callers must treat return as `CareerScore[]`.
+- Key mapping (user trait name → benchmark key, e.g. `openness → p1`) is handled **exclusively inside `computeAllScores`**. Normalization and repository layers are not responsible for key translation.
+- `rankAll` accepts only arrays. A hard guard at function entry will throw if a non-array is passed.
+- Insight engine runs **after** ranking and operates on `ranked.overall_top_10`.
+- PDF report generation is a placeholder returning `{ url: null }` — full implementation deferred.
+
+⚠️ **Sorting not yet implemented.** Backend returns unsorted arrays. Sorting will be added before production.
+
+---
+
+## 🔷 Alignment Engine — Final Architecture (Sprint 4 Completion)
+
+### Full Pipeline
+
+```
+DB (flat JSON responses: { p1, i1, a1, ... })
+  → Repository (fetchAssessmentResponses — raw extraction, no transformation)
+  → Classifier (prefix-based grouping: p* → personality, i* → interest, a* → aptitude)
+  → Normalizer (scale trait values to 0–100)
+  → Scorer (dot-product scoring with key mapping: trait name → benchmark key)
+  → Ranker (top 10 per category + overall)
+  → Insight Engine (strengths, weaknesses, recommendations, career explanations)
+  → API Response ({ data, error })
+```
+
+### Conditional Classification
+
+The classifier applies **only when input is flat** (top-level keys start with `p`, `i`, or `a`). If the repository already returns structured data (`{ personality, interest, aptitude }`), classification is skipped.
+
+```ts
+const isFlat = Object.keys(responses).some(
+    (key) => key.startsWith("p") || key.startsWith("i") || key.startsWith("a")
+);
+```
+
+### Separation of Concerns
+
+| Layer | Responsibility | MUST NOT |
+|---|---|---|
+| Repository | Raw DB extraction | Classify, normalize, or validate categories |
+| Classifier | Prefix-based grouping | Normalize values or access benchmarks |
+| Normalizer | Scale to 0–100 | Map keys or access benchmarks |
+| Scorer | Dot-product scoring + key mapping | Sort, rank, or produce insights |
+| Ranker | Sort + slice top 10 per category | Score or access DB |
+| Insight Engine | Generate explanations, strengths, recs | Modify scores or rankings |
+
+### Runtime
+
+- **Supabase Edge Functions (Deno)**
+- All local imports use `.ts` extensions
+- No Node.js-specific packages
+- Insight engine is non-blocking (wrapped in try/catch)
+
+⚠️ Sorting not yet implemented. Arrays returned unsorted. Will be addressed before production.
+
+⚠️ Sorting not implemented yet
+⚠️ Arrays returned unsorted (pre-production fix required)
+

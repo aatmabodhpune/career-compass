@@ -1,10 +1,13 @@
 import { AssessmentResponses, NormalizedScores } from './types.ts';
 
-export function normalizePersonality(data: Record<string, number[]>): Record<string, number> {
+export function normalizePersonality(data: Record<string, any>): Record<string, number> {
     const result: Record<string, number> = {};
-    for (const [trait, scores] of Object.entries(data)) {
-        if (!scores || scores.length === 0) {
-            throw new Error(`Personality trait ${trait} contains no scores for normalization.`);
+    for (const [trait, rawValue] of Object.entries(data)) {
+        // Coerce to array — DB may send plain number or array
+        const scores: number[] = Array.isArray(rawValue) ? rawValue : [rawValue];
+        if (scores.length === 0 || typeof scores[0] !== 'number') {
+            console.error(`Personality trait ${trait} has invalid value:`, rawValue);
+            continue;
         }
         const sum = scores.reduce((acc, val) => acc + val, 0);
         const avg = sum / scores.length;
@@ -14,11 +17,14 @@ export function normalizePersonality(data: Record<string, number[]>): Record<str
     return result;
 }
 
-export function normalizeInterest(data: Record<string, number[]>): Record<string, number> {
+export function normalizeInterest(data: Record<string, any>): Record<string, number> {
     const result: Record<string, number> = {};
-    for (const [trait, scores] of Object.entries(data)) {
-        if (!scores || scores.length === 0) {
-            throw new Error(`Interest trait ${trait} contains no scores for normalization.`);
+    for (const [trait, rawValue] of Object.entries(data)) {
+        // Coerce to array — DB may send plain number or array
+        const scores: number[] = Array.isArray(rawValue) ? rawValue : [rawValue];
+        if (scores.length === 0 || typeof scores[0] !== 'number') {
+            console.error(`Interest trait ${trait} has invalid value:`, rawValue);
+            continue;
         }
         const sum = scores.reduce((acc, val) => acc + val, 0);
         const avg = sum / scores.length;

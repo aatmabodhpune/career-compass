@@ -1,33 +1,40 @@
-import { supabase } from '../lib/supabaseClient';
+import type { AlignmentApiResult } from '../types/alignment';
+import { env } from '../config/env';
 
-export async function fetchAlignmentResults(session_id: string) {
-    if (session_id === null || session_id === undefined || session_id === '') {
-        return {
-            data: null,
-            error: "Invalid session_id"
-        };
+const ALIGNMENT_URL = 'https://peadrroqdtvysvdhgdrf.supabase.co/functions/v1/compute-alignment';
+
+export async function fetchAlignmentResults(
+    session_id: string
+): Promise<AlignmentApiResult> {
+    if (!session_id) {
+        return { data: null, error: 'Invalid input: session_id is required' };
     }
 
     try {
-        const response = await supabase.functions.invoke("compute-alignment", {
-            body: { session_id }
+        const response = await fetch(ALIGNMENT_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'apikey': env.supabaseAnonKey,
+                'Authorization': `Bearer ${env.supabaseAnonKey}`,
+            },
+            body: JSON.stringify({ session_id }),
         });
 
-        if (response.error) {
-            return {
-                data: null,
-                error: response.error.message
-            };
+        const json = await response.json();
+
+        if (!response.ok) {
+            const errorMsg = json?.error ?? `Server error: ${response.status} ${response.statusText}`;
+            return { data: null, error: errorMsg };
         }
 
-        return {
-            data: response.data,
-            error: null
-        };
-    } catch (err: any) {
-        return {
-            data: null,
-            error: "Unexpected error"
-        };
+        // Return raw API response — no transformation, no sorting
+        return { data: json.data ?? null, error: json.error ?? null };
+
+    } catch (error) {
+        if (error instanceof Error) {
+            return { data: null, error: error.message };
+        }
+        return { data: null, error: 'An unexpected network error occurred' };
     }
 }

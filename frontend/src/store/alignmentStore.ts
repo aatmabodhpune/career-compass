@@ -1,21 +1,16 @@
 import { create } from 'zustand';
+import type { AlignmentResponse } from '../types/alignment';
 import { fetchAlignmentResults } from '../api/alignment';
 
-export type AlignmentResult = {
-    overall_top_10?: any[];
-    personality_top_10?: any[];
-    interest_top_10?: any[];
-    aptitude_top_10?: any[];
-} | any;
-
-export interface AlignmentState {
-    results: AlignmentResult | null;
+interface AlignmentState {
+    results: AlignmentResponse | null;
     loading: boolean;
     error: string | null;
     fetchResults: (session_id: string) => Promise<void>;
+    reset: () => void;
 }
 
-export const useAlignmentStore = create<AlignmentState>((set) => ({
+export const useAlignmentStore = create<AlignmentState>()((set) => ({
     results: null,
     loading: false,
     error: null,
@@ -25,17 +20,14 @@ export const useAlignmentStore = create<AlignmentState>((set) => ({
 
         const { data, error } = await fetchAlignmentResults(session_id);
 
-        if (error) {
-            set({
-                error: error,
-                loading: false
-            });
-        } else {
-            set({
-                results: data,
-                loading: false,
-                error: null
-            });
+        if (error || !data) {
+            set({ results: null, error: error ?? 'Unknown error', loading: false });
+            return;
         }
-    }
+
+        // Store raw API response — no transformation, no sorting
+        set({ results: data, error: null, loading: false });
+    },
+
+    reset: () => set({ results: null, loading: false, error: null }),
 }));

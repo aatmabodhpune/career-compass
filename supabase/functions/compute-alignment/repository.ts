@@ -19,73 +19,53 @@ export function getSupabaseClient(): SupabaseClient {
     return supabaseInstance;
 }
 
-export function classifyResponses(responses: Record<string, any>): AssessmentResponses {
-    const personality: Record<string, number[]> = {};
-    const interest: Record<string, number[]> = {};
-    const aptitude: Record<string, any> = {};
+// Replaced unstructured classification logic permanently in favor of explicit dimensional mapping.
 
-    let hasPersonality = false;
-    let hasInterest = false;
-    let hasAptitude = false;
-
-    for (const [key, value] of Object.entries(responses)) {
-        if (typeof key !== 'string') continue;
-        
-        if (key.startsWith('p')) {
-            if (typeof value === 'number') {
-                if (!personality[key]) personality[key] = [];
-                personality[key].push(value);
-                hasPersonality = true;
-            }
-        } else if (key.startsWith('i')) {
-            if (typeof value === 'number') {
-                if (!interest[key]) interest[key] = [];
-                interest[key].push(value);
-                hasInterest = true;
-            }
-        } else if (key.startsWith('a')) {
-            aptitude[key] = value;
-            hasAptitude = true;
-        }
-    }
-
-    if (!hasPersonality && !hasInterest && !hasAptitude) {
-        throw new Error("No recognized categorical keys (p/i/a) found in assessment responses.");
-    }
-
-    if (!hasPersonality || !hasInterest || !hasAptitude) {
-        throw new Error("Missing one or more required categories (personality, interest, or aptitude).");
-    }
-
-    return { personality, interest, aptitude };
-}
-
-export async function fetchAssessmentResponses(session_id: string): Promise<AssessmentResponses> {
+export async function fetchAssessmentResponses(session_id: string): Promise<any> {
+    console.log("STEP 1: FETCH START", session_id);
     const supabase = getSupabaseClient();
     
-    // Explicit targeting avoiding rigid legacy `assessment_type` boundaries seamlessly combining generic unstructured JSONB outputs.
     const { data, error } = await supabase
         .from('assessment_responses')
         .select('responses')
         .eq('session_id', session_id);
 
+    console.log("STEP 2: DB RESULT:", data);
+    console.log("STEP 2: DB ERROR:", error);
+
     if (error) {
         throw new Error(`Error fetching assessment responses: ${error.message}`);
     }
 
-    // Safely trap empty maps preventing silent fails downstream
     if (!data || data.length === 0) {
-        throw new Error("No assessment responses found for the given session.");
+        throw new Error("No responses found for session");
     }
 
-    const mergedResponses: Record<string, any> = {};
-    for (const row of data) {
-        if (row.responses && typeof row.responses === 'object') {
-            Object.assign(mergedResponses, row.responses);
-        }
-    }
+    const raw = data[0].responses;
 
-    return classifyResponses(mergedResponses);
+    // Handle double-nested case: { responses: { p1: 3 } } vs { p1: 3 }
+    const responses = raw?.responses ? raw.responses : raw;
+
+    console.log("STEP 3: RETURN VALUE:", responses);
+    return responses;
+}
+
+export async function verifyAssessmentSession(session_id: string): Promise<void> {
+    const supabase = getSupabaseClient();
+    
+    const { data: session, error } = await supabase
+        .from('assessment_sessions')
+        .select('status')
+        .eq('id', session_id)
+        .single();
+        
+    if (error || !session) {
+        throw new Error("Session not found");
+    }
+    
+    if (session.status !== "completed") {
+        throw new Error("Assessment not completed");
+    }
 }
 
 export async function fetchCareerBenchmarks(): Promise<CareerBenchmark[]> {
@@ -105,19 +85,22 @@ export async function fetchCareerBenchmarks(): Promise<CareerBenchmark[]> {
         throw new Error("No active career benchmarks found.");
     }
 
+    console.log("BENCHMARKS:", data);
+
     return data.map((row: any) => {
-        const scores = row.benchmark_scores;
-        
-        if (!scores || !scores.personality || !scores.interest || !scores.aptitude || !scores.weights) {
-            throw new Error(`Invalid benchmark_scores structure for ID: ${row.id}`);
+        if (!row.benchmark_scores) {
+            console.error("Invalid benchmark_scores for row:", row.id);
+            throw new Error(`Invalid benchmark_scores for ID: ${row.id}`);
         }
+
+        const bs = row.benchmark_scores;
 
         return {
             career_id: row.id,
-            personality: scores.personality,
-            interest: scores.interest,
-            aptitude: scores.aptitude,
-            weights: scores.weights
+            personality: bs.personality,
+            interest: bs.interest,
+            aptitude: bs.aptitude,
+            weights: bs.weights
         };
     }) as CareerBenchmark[];
 }

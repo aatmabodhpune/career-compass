@@ -1,5 +1,7 @@
 export type RequestPayload = {
     session_id: string;
+    user_id?: string;
+    school_id?: string;
 };
 
 export type AssessmentResponses = {
@@ -39,6 +41,23 @@ export type RankedResults = {
     personality_top_10: CareerScore[];
     interest_top_10: CareerScore[];
     aptitude_top_10: CareerScore[];
+    insights?: {
+        strengths: string[];
+        weaknesses: string[];
+        recommendations: any[];
+    };
+    career_details?: CareerSummary[];
+    report?: {
+        url: string | null;
+    };
+};
+
+export type CareerSummary = {
+    career_id: string;
+    score: number;
+    explanation: string;
+    strengths_used: string[];
+    improvement_areas: string[];
 };
 
 export type AlignmentResult = RankedResults;
