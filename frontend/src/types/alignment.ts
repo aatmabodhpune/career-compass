@@ -11,6 +11,7 @@ export interface Insights {
 
 export interface CareerScore {
     career_id: string;
+    career_name: string;
     personality_score: number;
     interest_score: number;
     aptitude_score: number;
@@ -19,6 +20,7 @@ export interface CareerScore {
 
 export interface CareerDetail {
     career_id: string;
+    career_name: string;
     score: number;
     explanation: string;
     strengths_used: string[];

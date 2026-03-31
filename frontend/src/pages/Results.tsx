@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { useAssessmentStore } from '../store/assessmentStore';
 import { useAlignmentStore } from '../store/alignmentStore';
+import { formatScore } from '../utils/formatScore';
 import type { CareerScore, CareerDetail, Recommendation } from '../types/alignment';
 
 // ─── Primitives ──────────────────────────────────────────────────────────────
@@ -18,13 +19,53 @@ function Empty() {
     return <p className="text-gray-400 text-sm">No data available.</p>;
 }
 
-// ─── Career Card (explicit values only — no dynamic field access) ─────────────
+function MatchLabel({ index }: { index: number }) {
+    if (index === 0) {
+        return (
+            <span className="inline-block text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
+                Best Match
+            </span>
+        );
+    }
+    if (index === 1 || index === 2) {
+        return (
+            <span className="inline-block text-xs font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-700">
+                Strong Fit
+            </span>
+        );
+    }
+    return null;
+}
 
-function CareerCard({ careerId, score }: { careerId: string; score: number }) {
+// ─── Career Card ─────────────────────────────────────────────────────────────
+
+function CareerCard({
+    careerName,
+    mainScore,
+    subScores,
+    index,
+}: {
+    careerName: string;
+    mainScore: number;
+    subScores?: { label: string; value: number }[];
+    index: number;
+}) {
     return (
-        <div className="border border-gray-100 rounded-lg p-4 mb-3">
-            <p className="font-bold text-gray-900 text-sm">{careerId}</p>
-            <p className="text-gray-500 text-sm mt-1">{score}</p>
+        <div className="border border-gray-100 rounded-lg p-5 mb-4 shadow-sm hover:shadow-md transition-shadow bg-white">
+            <div className="flex items-center justify-between mb-2">
+                <p className="font-bold text-gray-900 text-lg">{careerName}</p>
+                <MatchLabel index={index} />
+            </div>
+            <p className="text-blue-600 font-semibold text-lg mb-1">Match Score: {formatScore(mainScore)}</p>
+            {subScores && subScores.length > 0 && (
+                <div className="flex flex-col gap-1 mt-3 pt-3 border-t border-gray-50">
+                    {subScores.map((sub) => (
+                        <p key={sub.label} className="text-sm text-gray-500">
+                            <span className="font-medium text-gray-700">{sub.label}:</span> {formatScore(sub.value)}
+                        </p>
+                    ))}
+                </div>
+            )}
         </div>
     );
 }
@@ -57,14 +98,22 @@ export default function Results() {
     // ── Loading ──
     if (loading) {
         return (
-            <div className="max-w-5xl mx-auto px-4 py-8 bg-gray-50 flex items-center justify-center min-h-screen">
-                <div className="bg-white rounded-xl shadow-md p-10 text-center">
-                    <p className="text-gray-700 font-semibold text-lg mb-2">
-                        Generating your results...
-                    </p>
-                    <p className="text-gray-400 text-sm">
-                        This may take a few moments.
-                    </p>
+            <div className="max-w-5xl mx-auto px-4 py-8 bg-gray-50 min-h-screen">
+                <div className="bg-white rounded-xl shadow-md p-6 mb-6">
+                    <div className="animate-pulse space-y-3">
+                        <div className="h-4 bg-gray-200 rounded w-1/4 mb-6"></div>
+                        <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                        <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+                        <div className="h-20 bg-gray-200 rounded"></div>
+                    </div>
+                </div>
+                <div className="bg-white rounded-xl shadow-md p-6 mb-6">
+                    <div className="animate-pulse space-y-3">
+                        <div className="h-4 bg-gray-200 rounded w-1/4 mb-6"></div>
+                        <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                        <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+                        <div className="h-20 bg-gray-200 rounded"></div>
+                    </div>
                 </div>
             </div>
         );
@@ -75,8 +124,14 @@ export default function Results() {
         return (
             <div className="max-w-5xl mx-auto px-4 py-8 bg-gray-50">
                 <div className="bg-white rounded-xl shadow-md p-6">
-                    <p className="text-sm font-semibold text-red-500 mb-1">Something went wrong</p>
-                    <p className="text-gray-600 text-sm">{error}</p>
+                    <p className="text-sm font-semibold text-red-500 mb-2">Something went wrong</p>
+                    <p className="text-gray-600 text-sm mb-4">{error}</p>
+                    <button
+                        onClick={() => fetchResults(session_id)}
+                        className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+                    >
+                        Retry
+                    </button>
                 </div>
             </div>
         );
@@ -109,12 +164,19 @@ export default function Results() {
 
             {/* 1. Overall Top Careers */}
             <Section title="Overall Top Careers">
+                <p className="text-sm text-gray-500 mb-4 tracking-tight">Higher score indicates better alignment.</p>
                 {overall.length === 0 ? <Empty /> : (
                     overall.map((item: CareerScore, index: number) => (
                         <CareerCard
                             key={`overall-${index}`}
-                            careerId={item.career_id}
-                            score={item.final_score}
+                            careerName={item.career_name}
+                            mainScore={item.final_score}
+                            subScores={[
+                                { label: 'Personality Score', value: item.personality_score },
+                                { label: 'Interest Score', value: item.interest_score },
+                                { label: 'Aptitude Score', value: item.aptitude_score },
+                            ]}
+                            index={index}
                         />
                     ))
                 )}
@@ -126,8 +188,9 @@ export default function Results() {
                     personality.map((item: CareerScore, index: number) => (
                         <CareerCard
                             key={`personality-${index}`}
-                            careerId={item.career_id}
-                            score={item.personality_score}
+                            careerName={item.career_name}
+                            mainScore={item.personality_score}
+                            index={index}
                         />
                     ))
                 )}
@@ -139,8 +202,9 @@ export default function Results() {
                     interest.map((item: CareerScore, index: number) => (
                         <CareerCard
                             key={`interest-${index}`}
-                            careerId={item.career_id}
-                            score={item.interest_score}
+                            careerName={item.career_name}
+                            mainScore={item.interest_score}
+                            index={index}
                         />
                     ))
                 )}
@@ -149,13 +213,20 @@ export default function Results() {
             {/* 4. Aptitude Matches */}
             <Section title="Aptitude Matches">
                 {aptitude.length === 0 ? <Empty /> : (
-                    aptitude.map((item: CareerScore, index: number) => (
-                        <CareerCard
-                            key={`aptitude-${index}`}
-                            careerId={item.career_id}
-                            score={item.aptitude_score}
-                        />
-                    ))
+                    aptitude.every(item => item.aptitude_score === 0) ? (
+                        <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded text-sm text-yellow-800">
+                            Aptitude evaluation is currently limited based on available inputs.
+                        </div>
+                    ) : (
+                        aptitude.map((item: CareerScore, index: number) => (
+                            <CareerCard
+                                key={`aptitude-${index}`}
+                                careerName={item.career_name}
+                                mainScore={item.aptitude_score}
+                                index={index}
+                            />
+                        ))
+                    )
                 )}
             </Section>
 
@@ -189,15 +260,17 @@ export default function Results() {
                 </div>
 
                 <div>
-                    <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-2">
+                    <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3">
                         Recommendations
                     </h3>
                     {recommendations.length === 0 ? <Empty /> : (
-                        <div className="space-y-3">
+                        <div className="space-y-4">
                             {recommendations.map((item: Recommendation, index: number) => (
-                                <div key={`rec-${index}`} className="border-l-2 border-gray-200 pl-4">
-                                    <p className="text-sm font-semibold text-gray-700">{item.area}</p>
-                                    <p className="text-sm text-gray-500 mt-0.5">{item.suggestion}</p>
+                                <div key={`rec-${index}`} className="border-l-2 border-blue-200 pl-4 py-1">
+                                    <p className="text-sm font-semibold text-gray-800 mb-1">{item.area}</p>
+                                    <p className="text-sm text-gray-600">
+                                        <span className="font-medium text-gray-700">To improve your fit:</span> {item.suggestion}
+                                    </p>
                                 </div>
                             ))}
                         </div>
@@ -209,14 +282,14 @@ export default function Results() {
             {/* 6. Career Details */}
             <Section title="Career Details">
                 {careerDetails.length === 0 ? <Empty /> : (
-                    <div className="space-y-6">
+                    <div className="space-y-8">
                         {careerDetails.map((item: CareerDetail, index: number) => (
                             <div
                                 key={`detail-${index}`}
-                                className="border-b border-gray-100 pb-6 last:border-0 last:pb-0"
+                                className="border-b border-gray-200 pb-8 last:border-0 last:pb-0"
                             >
-                                <p className="font-bold text-gray-900 text-base mb-2">{item.career_id}</p>
-                                <p className="text-gray-600 text-sm mb-4">{item.explanation}</p>
+                                <p className="font-bold text-gray-900 text-xl mb-3">{item.career_name}</p>
+                                <p className="text-gray-700 text-base leading-relaxed mb-5">{item.explanation}</p>
 
                                 {(item.strengths_used ?? []).length > 0 && (
                                     <div className="mb-3">
@@ -260,6 +333,7 @@ export default function Results() {
                     >
                         Download Report
                     </a>
+                    <p className="text-xs text-gray-400 mt-2">Link may expire. Download promptly.</p>
                 </Section>
             )}
 

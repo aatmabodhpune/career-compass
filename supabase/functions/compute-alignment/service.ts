@@ -101,6 +101,12 @@ export async function computeAlignmentService(payload: RequestPayload): Promise<
         console.error("Insight Engine Failure:", error);
     }
 
+    // ── SORT ALL ARRAYS DESC (Sprint 5 — Data Preparation) ──
+    ranked.overall_top_10.sort((a, b) => b.final_score - a.final_score);
+    ranked.personality_top_10.sort((a, b) => b.personality_score - a.personality_score);
+    ranked.interest_top_10.sort((a, b) => b.interest_score - a.interest_score);
+    ranked.aptitude_top_10.sort((a, b) => b.aptitude_score - a.aptitude_score);
+
     const finalResponse = {
         ...ranked,
         insights: insights || { strengths: [], weaknesses: [], recommendations: [] },

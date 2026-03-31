@@ -132,3 +132,23 @@ const isFlat = Object.keys(responses).some(
 ⚠️ Sorting not implemented yet
 ⚠️ Arrays returned unsorted (pre-production fix required)
 
+---
+
+## 🔷 Sprint 5 — Presentation Layer (Final)
+
+Describe:
+
+- No backend changes
+- No API changes
+- No DB changes
+
+Final flow (unchanged):
+
+Assessment → Edge Function → DB → Response  
+→ API Layer → Zustand → UI → Render
+
+Add:
+
+- Backend sorting now part of response layer
+- Career name mapping happens in API/store layer (NOT UI)
+- UI is strictly a renderer (no logic)
