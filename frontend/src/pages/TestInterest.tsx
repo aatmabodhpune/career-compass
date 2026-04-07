@@ -3,18 +3,33 @@ import { useNavigate } from 'react-router-dom';
 import { useAssessmentStore } from '../store/assessmentStore';
 import { questions } from '../data/questions';
 import QuestionCard from '../components/QuestionCard';
-import ProgressBar from '../components/ProgressBar';
-import { Container } from '../components/ui/Container';
+import { ProgressBar } from '../components/ui/ProgressBar';
+import { Container } from '../components/layout/Container';
 import { Button } from '../components/ui/Button';
+import { TestIntro } from '../components/test/TestIntro';
+import { PageHeader } from '../components/ui/PageHeader';
 
 export default function TestInterest() {
     const navigate = useNavigate();
     const { submitTestSection } = useAssessmentStore();
     const [submitting, setSubmitting] = useState(false);
+    const [started, setStarted] = useState(false);
     
     const testQuestions = questions.filter(q => q.id.startsWith('i'));
     const [currentIndex, setCurrentIndex] = useState(0);
     const question = testQuestions[currentIndex];
+
+    if (!started) {
+        return (
+            <TestIntro 
+                title="Interest Inventory"
+                description="Tell us what activities you enjoy. We use the RIASEC model to match your passions with compatible career paths."
+                duration="2-3 mins"
+                totalQuestions={testQuestions.length}
+                onStart={() => setStarted(true)}
+            />
+        );
+    }
 
     const handleNext = async () => {
         if (submitting) return;
@@ -44,37 +59,29 @@ export default function TestInterest() {
 
     return (
         <Container>
-            <div className="max-w-4xl mx-auto w-full flex flex-col gap-8 py-8">
-                <div>
-                    <ProgressBar current={currentIndex + 1} total={testQuestions.length} />
+            <div className="max-w-4xl mx-auto w-full flex flex-col gap-6 py-8 animate-in fade-in duration-500">
+                <PageHeader 
+                    title="Interest Inventory"
+                    subtitle={`Question ${currentIndex + 1} of ${testQuestions.length}`}
+                />
+
+                <div className="w-full mb-2">
+                    <ProgressBar value={((currentIndex + 1) / testQuestions.length) * 100} showLabel />
                 </div>
                 
-                <div>
-                    <div className="flex items-center justify-between mb-3">
-                        <button
-                            type="button"
-                            onClick={handlePrevious}
-                            className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
-                        >
-                            ← Back
-                        </button>
-                        <span className="text-xs text-gray-400">
-                            Question {currentIndex + 1}
-                        </span>
-                    </div>
-                    
+                <div className="mt-2">
                     <QuestionCard
                         question={question}
                         onAnswer={handleNext}
                     />
                 </div>
 
-                <div className="flex justify-between gap-4 mt-4">
-                    <Button variant="secondary" onClick={handlePrevious} disabled={submitting}>
+                <div className="flex justify-between items-center gap-4 mt-8 pt-6 border-t border-gray-100">
+                    <Button size="lg" variant="outline" onClick={handlePrevious} disabled={submitting}>
                         Previous
                     </Button>
-                    <Button onClick={handleNext} disabled={submitting}>
-                        {submitting ? 'Saving...' : currentIndex === testQuestions.length - 1 ? 'Finish' : 'Next'}
+                    <Button size="lg" onClick={handleNext} disabled={submitting}>
+                        {submitting ? 'Saving...' : currentIndex === testQuestions.length - 1 ? 'Finish Section' : 'Next Question'}
                     </Button>
                 </div>
             </div>

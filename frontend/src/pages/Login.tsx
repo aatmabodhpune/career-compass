@@ -2,9 +2,11 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../store/authStore";
 import { loginWithToken } from "../api/auth";
-import { Container } from "../components/ui/Container";
+import { Container } from "../components/layout/Container";
 import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
+import { InputField } from "../components/ui/InputField";
+import { PageHeader } from "../components/ui/PageHeader";
 import { useAssessmentStore } from "../store/assessmentStore";
 
 export default function Login() {
@@ -57,36 +59,47 @@ export default function Login() {
     };
 
     return (
-        <Container>
-            <div className="flex items-center justify-center min-h-[60vh]">
-                <Card variant="centered" className="space-y-6">
-                    <div>
-                        <h1 className="text-2xl font-bold text-gray-900 mb-1">Career Compass</h1>
-                        <p className="text-sm text-gray-500">Enter your access token to begin.</p>
-                    </div>
-                    <form onSubmit={handleSubmit} className="space-y-4 text-left">
-                        <div className="space-y-1">
-                            <label className="text-sm text-gray-500">Access token</label>
-                            <input
-                                type="text"
-                                value={token}
-                                onChange={(e) => setToken(e.target.value)}
-                                placeholder="Enter token"
-                                disabled={loading}
-                                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent text-gray-800"
-                            />
-                            {error && <p className="text-sm text-red-500">{error}</p>}
-                        </div>
-                        <Button
-                            type="submit"
-                            disabled={loading}
-                            className="w-full justify-center"
-                        >
-                            {loading ? "Loading..." : "Submit"}
-                        </Button>
-                    </form>
-                </Card>
-            </div>
+        <Container className="min-h-screen flex items-center justify-center bg-gray-50/50">
+            <Card className="w-full max-w-md space-y-8 animate-in fade-in zoom-in duration-500">
+                <div className="text-center">
+                    <PageHeader 
+                        title="Career Compass" 
+                        subtitle="Enter your access token to begin your journey."
+                        className="text-center sm:items-center sm:justify-center p-0"
+                    />
+                </div>
+                
+                <form onSubmit={handleSubmit} className="space-y-6">
+                    <InputField
+                        label="Access Token"
+                        id="token"
+                        type="text"
+                        value={token}
+                        onChange={(e) => setToken(e.target.value)}
+                        placeholder="e.g. COMPASS-XXXX-XXXX"
+                        disabled={loading}
+                        error={error || undefined}
+                        helperText="Your unique identifier provided by your institution."
+                    />
+                    
+                    <Button
+                        type="submit"
+                        disabled={loading}
+                        className="w-full"
+                        size="lg"
+                    >
+                        {loading ? (
+                            <span className="flex items-center gap-2">
+                                <svg className="animate-spin h-5 w-5 text-current" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                </svg>
+                                Authenticating...
+                            </span>
+                        ) : "Get Started"}
+                    </Button>
+                </form>
+            </Card>
         </Container>
     );
 }

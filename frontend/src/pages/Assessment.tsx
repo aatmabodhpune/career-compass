@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { useAuthStore } from '../store/authStore';
@@ -11,8 +11,8 @@ import {
 } from '../data/questions';
 
 import QuestionCard from '../components/QuestionCard';
-import ProgressBar from '../components/ProgressBar';
-import { Container } from '../components/ui/Container';
+import { ProgressBar } from '../components/ui/ProgressBar';
+import { Container } from '../components/layout/Container';
 import { Button } from '../components/ui/Button';
 
 export default function Assessment() {
@@ -44,7 +44,7 @@ export default function Assessment() {
     if (!session_id && status !== 'completed') {
         return (
             <div className="flex justify-center items-center min-h-screen bg-gray-50">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600"></div>
             </div>
         );
     }
@@ -119,7 +119,7 @@ export default function Assessment() {
         <Container>
             <div className="max-w-4xl mx-auto w-full flex flex-col gap-8">
                 <div>
-                    <ProgressBar current={globalPosition} total={TOTAL_QUESTIONS} />
+                    <ProgressBar value={(globalPosition / TOTAL_QUESTIONS) * 100} showLabel />
                 </div>
 
                 {question && (
@@ -149,7 +149,7 @@ export default function Assessment() {
                 <div className="flex flex-wrap justify-between gap-4 mt-4">
                     <Button
                         type="button"
-                        variant="secondary"
+                        variant="outline"
                         onClick={handlePrevious}
                         disabled={isFirstQuestion || isCompleted || isSubmitting || showSubmitModal}
                     >
@@ -186,7 +186,7 @@ export default function Assessment() {
                         <div className="flex justify-end gap-3">
                             <Button
                                 onClick={() => setShowSubmitModal(false)}
-                                variant="secondary"
+                                variant="outline"
                                 disabled={isSubmitting}
                             >
                                 Go Back

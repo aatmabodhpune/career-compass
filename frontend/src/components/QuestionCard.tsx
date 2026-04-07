@@ -1,4 +1,3 @@
-import React from 'react';
 import type { Question } from '../data/questions';
 import LikertScale from './LikertScale';
 import MCQOptions from './MCQOptions';
@@ -24,23 +23,23 @@ export default function QuestionCard({ question, onAnswer }: QuestionCardProps) 
     };
 
     return (
-        <Card className="w-full max-w-3xl mx-auto">
-            <div className="mb-6 text-center flex flex-col items-center gap-4">
-                <span className="inline-block px-3 py-1 bg-blue-50 text-blue-700 text-xs font-bold tracking-widest rounded-md uppercase">
+        <Card className="w-full max-w-3xl mx-auto p-8 md:p-10 shadow-sm space-y-8">
+            <div className="text-center space-y-4">
+                <span className="inline-block px-3 py-1 bg-teal-50 text-teal-700 text-xs font-bold tracking-widest rounded-full uppercase border border-teal-100/50">
                     {question.section}
                 </span>
-                <h2 className="text-2xl font-bold text-gray-900">
+                <h2 className="text-3xl md:text-4xl font-black text-gray-900 leading-tight">
                     {question.question}
                 </h2>
                 {question.image && (
-                    <div className="w-full max-w-sm h-40 bg-gray-50 rounded-lg flex items-center justify-center border border-dashed border-gray-300">
-                        <span className="text-sm text-gray-500">
-                            [Visual: {question.image}]
+                    <div className="w-full max-w-sm mx-auto h-48 bg-gray-50/50 rounded-2xl flex items-center justify-center border border-dashed border-gray-200 p-6 text-center mt-6">
+                        <span className="text-sm font-medium text-gray-400 italic">
+                            [Visual Reference: {question.image}]
                         </span>
                     </div>
                 )}
             </div>
-            <div className="mt-6">
+            <div className="pt-4 flex justify-center w-full">
                 {question.type === 'likert' ? (
                     <LikertScale
                         options={question.options}

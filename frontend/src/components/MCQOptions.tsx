@@ -1,5 +1,3 @@
-import React from 'react';
-
 interface MCQOptionsProps {
     options: (number | string)[];
     selectedValue?: number | string;
@@ -8,7 +6,7 @@ interface MCQOptionsProps {
 
 export default function MCQOptions({ options, selectedValue, onChange }: MCQOptionsProps) {
     return (
-        <div className="flex flex-col gap-3 w-full max-w-md mx-auto">
+        <div className="flex flex-col gap-4 w-full">
             {options.map((option) => {
                 const isSelected = selectedValue === option;
                 return (
@@ -16,8 +14,10 @@ export default function MCQOptions({ options, selectedValue, onChange }: MCQOpti
                         key={option}
                         type="button"
                         onClick={() => onChange(option)}
-                        className={`w-full text-left p-4 rounded-lg border font-medium transition-all duration-150 ease-in-out
-                        ${isSelected ? 'bg-blue-600 text-white border-blue-600 shadow-sm scale-[0.98] ring-2 ring-blue-300' : 'bg-white text-gray-700 border-gray-300 hover:border-blue-400'}`}
+                        className={`w-full text-left p-5 rounded-xl border-2 font-medium transition-all duration-200 shadow-sm hover:shadow
+                        ${isSelected 
+                            ? 'border-teal-600 bg-teal-50/80 text-teal-900 scale-[1.01]' 
+                            : 'border-gray-200 bg-white text-gray-700 hover:border-teal-300 hover:bg-gray-50'}`}
                         aria-pressed={isSelected}
                     >
                         {option}
