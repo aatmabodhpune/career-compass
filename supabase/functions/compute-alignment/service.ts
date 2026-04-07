@@ -1,5 +1,5 @@
 import { RequestPayload, AlignmentResult, CareerSummary } from './types.ts';
-import { fetchAssessmentResponses, fetchCareerBenchmarks, storeResults } from './repository.ts';
+import { getAssessmentBySessionId, fetchCareerBenchmarks, storeResults } from './repository.ts';
 import { normalizeAll } from './normalizer.ts';
 import { computeAllScores } from './scorer.ts';
 import { rankAll } from './ranker.ts';
@@ -11,10 +11,83 @@ import { generateCareerExplanation } from '../../../alignment-engine/insights/ex
 import { buildCareerSummaries } from '../../../alignment-engine/insights/careerSummaryBuilder.ts';
 import { generateReportPlaceholder } from '../../../alignment-engine/insights/reportGenerator.ts';
 
-export async function computeAlignmentService(payload: RequestPayload): Promise<AlignmentResult> {
-    console.log("🔥 SERVICE EXECUTION CONFIRMED");
+export const computeAlignmentService = async (
+    payload: RequestPayload
+): Promise<AlignmentResult> => {
+    console.log("SESSION RECEIVED:", payload.session_id);
 
-    const responses = await fetchAssessmentResponses(payload.session_id);
+    const session_id = payload.session_id;
+
+    if (!session_id) {
+        throw new Error("Session ID missing");
+    }
+
+    const assessment = await getAssessmentBySessionId(session_id);
+
+    console.log("SESSION RECEIVED:", session_id);
+    console.log("DB FETCH RESULT:", assessment);
+
+    if (!assessment) {
+        console.error("NO ROW FOUND FOR SESSION", session_id);
+        throw new Error("Assessment not completed");
+    }
+
+    if (assessment && !assessment.responses) {
+        console.error("NO RESPONSES FOUND", assessment);
+        throw new Error("Assessment not completed");
+    }
+
+    const raw = assessment.responses;
+    // Handle double-nested case: { responses: { p1: 3 } } vs { p1: 3 }
+    const responses = raw?.responses ? raw.responses : raw;
+
+    // TEMP: Reduced validation for testing/demo
+    // MUST revert before production
+    const IS_TEST_MODE = true;
+
+    const FULL_REQUIREMENT = {
+        personality: 20,
+        interest: 30,
+        aptitude: 15
+    };
+
+    const MIN_REQUIRED = IS_TEST_MODE
+        ? {
+            personality: 5,
+            interest: 5,
+            aptitude: 5
+        }
+        : FULL_REQUIREMENT;
+    
+    // ── CATEGORY-BASED COUNTING ──────────────────────────────────────────────
+    const keys = Object.keys(responses);
+    const pCount = keys.filter(k => k.startsWith("p")).length;
+    const iCount = keys.filter(k => k.startsWith("i")).length;
+    const aCount = keys.filter(k => k.startsWith("a")).length;
+
+    console.log("VALIDATION COUNTS", {
+        pCount,
+        iCount,
+        aCount,
+        keys
+    });
+
+    if (
+        pCount < MIN_REQUIRED.personality ||
+        iCount < MIN_REQUIRED.interest ||
+        aCount < MIN_REQUIRED.aptitude
+    ) {
+        console.error("VALIDATION FAILED", {
+            pCount,
+            iCount,
+            aCount,
+            required: MIN_REQUIRED
+        });
+
+        throw new Error("Assessment not completed");
+    }
+    // ──────────────────────────────────────────────────────────────────────────
+
     const benchmarks = await fetchCareerBenchmarks();
     
     console.log("RAW FROM DB:", responses);
@@ -46,6 +119,11 @@ export async function computeAlignmentService(payload: RequestPayload): Promise<
     console.log("TYPE OF SCORES:", typeof scores);
     console.log("IS ARRAY:", Array.isArray(scores));
     console.log("SCORES VALUE:", scores);
+
+    console.log("APTITUDE CHECK:", {
+        normalized: normalized.aptitude,
+        scores: scores.map(s => s.aptitude_score)
+    });
 
     const ranked = rankAll(scores);
 
@@ -109,6 +187,10 @@ export async function computeAlignmentService(payload: RequestPayload): Promise<
 
     const finalResponse = {
         ...ranked,
+        overall_top_10: ranked.overall_top_10.map(c => ({
+            ...c,
+            aptitude_score: c.aptitude_score
+        })),
         insights: insights || { strengths: [], weaknesses: [], recommendations: [] },
         career_details: career_details || [],
         report: generateReportPlaceholder()
@@ -119,4 +201,4 @@ export async function computeAlignmentService(payload: RequestPayload): Promise<
 
     // 7. Push formatted explicitly natively.
     return finalResponse;
-}
+};

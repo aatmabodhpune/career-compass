@@ -1,4 +1,3 @@
-import React, { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { useAssessmentStore } from '../store/assessmentStore';
@@ -8,41 +7,16 @@ import { Button } from '../components/ui/Button';
 
 export default function Home() {
     const navigate = useNavigate();
-    // Safe bounds relying explicitly against standard token mapping
-    const { token, logout } = useAuthStore();
-    const { session_id, status, startSession, resetAssessment } = useAssessmentStore();
-    const hasStarted = useRef(false);
-
-    useEffect(() => {
-        if (token && !hasStarted.current && status !== "completed") {
-            hasStarted.current = true;
-            console.log("startSession triggered ONCE");
-            startSession(token);
-        }
-    }, [token]);
-
-    const handleActionClick = () => {
-        if (status === 'completed') {
-            navigate('/results');
-        } else {
-            navigate('/assessment');
-        }
-    };
+    const { logout } = useAuthStore();
+    const { session_id, status, resetAssessment } = useAssessmentStore();
 
     const handleLogout = () => {
-        // Clear assessment state when user logs out to avoid leaking sessions
         resetAssessment();
         logout();
         navigate('/login');
     };
 
-    const getButtonText = () => {
-        if (status === 'completed') return 'View Results';
-        if (status === 'in_progress') return 'Continue Assessment';
-        return 'Start Assessment';
-    };
-
-    const isCheckingSession = !session_id && status !== 'completed' && status !== 'error' && status !== 'idle';
+    const isCheckingSession = !session_id && status !== 'error' && status !== 'idle';
 
     return (
         <Container>
@@ -62,15 +36,17 @@ export default function Home() {
                             Discover your potential through a personality, interest, and aptitude assessment.
                         </p>
                     </div>
-                    <Button
-                        onClick={handleActionClick}
-                        disabled={isCheckingSession || status === 'error'}
-                        className="w-full justify-center"
-                    >
-                        {isCheckingSession ? 'Checking session...' : getButtonText()}
-                    </Button>
+                    {isCheckingSession && (
+                        <div className="flex flex-col items-center justify-center py-4">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-2"></div>
+                            <p className="text-sm text-gray-500">Initializing your session...</p>
+                        </div>
+                    )}
                     {status === 'error' && (
-                        <p className="text-sm text-red-500 text-center">Failed to connect to assessment services.</p>
+                        <div className="text-center p-4">
+                            <p className="text-sm text-red-500 mb-4">Failed to connect to assessment services.</p>
+                            <Button onClick={() => window.location.reload()} variant="secondary" className="w-full justify-center">Retry</Button>
+                        </div>
                     )}
                 </Card>
             </div>

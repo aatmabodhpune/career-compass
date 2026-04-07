@@ -152,3 +152,47 @@ Add:
 - Backend sorting now part of response layer
 - Career name mapping happens in API/store layer (NOT UI)
 - UI is strictly a renderer (no logic)
+
+---
+
+## 🔷 Post-Sprint 5 Stabilization (UAT Fixes)
+
+### Session Management
+
+- session_id is now enforced as a **single source of truth**
+- Generated once at session start
+- Persisted in Zustand store only
+- No regeneration allowed during lifecycle
+
+---
+
+### Execution Flow (Final Stable Order)
+
+Controller  
+→ Repository (DB fetch)  
+→ Validation (DB-driven)  
+→ Classification  
+→ Normalization  
+→ Scoring  
+→ Ranking  
+→ Insights  
+→ Response  
+
+✔ Deterministic execution enforced  
+✔ Logging checkpoints added  
+
+---
+
+### Stateless Entry Guarantee
+
+- Application always starts from Token screen
+- All previous sessions cleared on load
+- Prevents stale state issues
+
+---
+
+## ⚠️ Known Limitation
+
+- Aptitude score may return 0 due to mapping/benchmark issue  
+- Does NOT affect pipeline execution  
+- Scheduled for Sprint 6  

@@ -111,3 +111,18 @@ The frontend sends a request body containing ONLY `session_id`:
 - Backend arrays are **now sorted DESCENDING** (final_score, etc.) before reaching the API layer.
 - `career_id` mapping to `career_name` is performed **globally** in the frontend API/Store prior to rendering, relying on `fetchCareerMap()`.
 - The alignment response schema remains completely unchanged as per Sprint 4 specifications.
+
+---
+
+## 🔷 Validation Update (Post UAT)
+
+- Validation no longer depends on request payload  
+- System strictly validates using DB (`assessment_responses`)  
+
+### Request:
+
+```json
+{
+  "session_id": "uuid"
+}
+```

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../store/authStore";
 import { loginWithToken } from "../api/auth";
@@ -12,17 +12,9 @@ export default function Login() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const setStudent = useAuthStore((state) => state.setStudent);
-    const setStoreToken = useAuthStore((state) => state.setToken);
-    const { token: activeToken, _hasHydrated } = useAuthStore();
+    const { setStudent, setToken: setStoreToken } = useAuthStore();
+    const { startSession, resetSession } = useAssessmentStore();
     const navigate = useNavigate();
-
-    // 🔴 4. FIX LOGIN FLOW - Bounce authenticated users directly dynamically bypassing login wall
-    useEffect(() => {
-        if (_hasHydrated && activeToken) {
-            navigate("/", { replace: true });
-        }
-    }, [activeToken, _hasHydrated, navigate]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -47,10 +39,18 @@ export default function Login() {
             }
 
             // Ensure previous assessment session state is fully cleared on new login
-            useAssessmentStore.getState().resetAssessment();
-
+            resetSession();
             setStoreToken(token);
-            navigate("/", { replace: true });
+
+            // ✅ FIX: Start session and redirect to demographics immediately
+            try {
+                await startSession(token);
+                navigate("/demographics", { replace: true });
+            } catch (err) {
+                console.error("Failed to start session:", err);
+                // Even on session failure, we navigate to let rehydration/App-level logic try again if appropriate
+                navigate("/demographics", { replace: true });
+            }
         } finally {
             setLoading(false);
         }

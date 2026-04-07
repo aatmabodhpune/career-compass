@@ -76,6 +76,7 @@ export const useAlignmentStore = create<AlignmentState>()((set) => ({
     error: null,
 
     fetchResults: async (session_id: string) => {
+        console.log("ALIGNMENT SESSION:", session_id);
         set({ loading: true, error: null });
 
         // Fetch alignment results and career map in parallel

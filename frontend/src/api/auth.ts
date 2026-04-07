@@ -11,7 +11,7 @@ export async function loginWithToken(rawToken: string): Promise<AuthResponse> {
     }
 
     try {
-        const response = await fetch('https://peadrroqdtvysvdhgdrf.supabase.co/functions/v1/auth-token-logic', {
+        const response = await fetch(`${env.supabaseUrl}/functions/v1/auth-token-logic`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

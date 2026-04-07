@@ -1,8 +1,6 @@
 import type { AlignmentApiResult } from '../types/alignment';
 import { env } from '../config/env';
 
-const ALIGNMENT_URL = 'https://peadrroqdtvysvdhgdrf.supabase.co/functions/v1/compute-alignment';
-
 export async function fetchAlignmentResults(
     session_id: string
 ): Promise<AlignmentApiResult> {
@@ -11,7 +9,7 @@ export async function fetchAlignmentResults(
     }
 
     try {
-        const response = await fetch(ALIGNMENT_URL, {
+        const response = await fetch(`${env.supabaseUrl}/functions/v1/compute-alignment`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

@@ -21,8 +21,8 @@ export default function LikertScale({ options, selectedValue, onChange }: Likert
                             key={option}
                             type="button"
                             onClick={() => onChange(option)}
-                            className={`w-10 h-10 rounded-full border flex items-center justify-center text-sm font-medium transition-colors
-                            ${isSelected ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-100'}`}
+                            className={`w-10 h-10 rounded-full border flex items-center justify-center text-sm font-medium transition-all duration-150 ease-in-out
+                            ${isSelected ? 'bg-blue-600 text-white border-blue-600 shadow-sm scale-[0.98] ring-2 ring-blue-300' : 'bg-white text-gray-700 border-gray-300 hover:border-blue-400'}`}
                             aria-label={`Select option ${option}`}
                             aria-pressed={isSelected}
                         >

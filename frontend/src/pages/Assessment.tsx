@@ -126,7 +126,23 @@ export default function Assessment() {
                     <div
                         className={`transition-opacity duration-300 ${isCompleted || isSubmitting || showSubmitModal ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}
                     >
-                        <QuestionCard question={question} />
+                        <div className="flex items-center justify-between mb-3">
+                            <button
+                                type="button"
+                                onClick={handlePrevious}
+                                disabled={isFirstQuestion || isCompleted || isSubmitting || showSubmitModal}
+                                className="text-sm text-gray-500 hover:text-gray-700 disabled:opacity-30 transition-colors"
+                            >
+                                ← Back
+                            </button>
+                            <span className="text-xs text-gray-400">
+                                Question {globalPosition}
+                            </span>
+                        </div>
+                        <QuestionCard
+                            question={question}
+                            onAnswer={isLastQuestion ? undefined : handleNext}
+                        />
                     </div>
                 )}
 

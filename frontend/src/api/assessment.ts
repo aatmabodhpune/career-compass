@@ -1,14 +1,5 @@
 import { env } from '../config/env';
 
-const BASE_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-
-console.log("SUPABASE URL:", import.meta.env.VITE_SUPABASE_URL);
-
-if (!BASE_URL) {
-    console.error("Missing VITE_SUPABASE_URL");
-    throw new Error("Missing VITE_SUPABASE_URL environment variable for Supabase base URL");
-}
-
 /** 4. API TIMEOUT HANDLING */
 async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = 10000) {
     const controller = new AbortController();
@@ -30,7 +21,7 @@ async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = 1
 
 export const assessmentApi = {
     startSession: async (token: string) => {
-        const res = await fetchWithTimeout(`${BASE_URL}/functions/v1/assessment-start`, {
+        const res = await fetchWithTimeout(`${env.supabaseUrl}/functions/v1/assessment-start`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
@@ -50,7 +41,7 @@ export const assessmentApi = {
         let retries = 1;
         while (retries >= 0) {
             try {
-                const res = await fetchWithTimeout(`${BASE_URL}/functions/v1/assessment-save`, {
+                const res = await fetchWithTimeout(`${env.supabaseUrl}/functions/v1/assessment-save`, {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json",
@@ -72,7 +63,7 @@ export const assessmentApi = {
     },
 
     submitAssessment: async (token: string, session_id: string) => {
-        const res = await fetchWithTimeout(`${BASE_URL}/functions/v1/assessment-submit`, {
+        const res = await fetchWithTimeout(`${env.supabaseUrl}/functions/v1/assessment-submit`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",

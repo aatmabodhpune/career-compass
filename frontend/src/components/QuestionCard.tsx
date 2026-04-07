@@ -7,9 +7,10 @@ import { Card } from './ui/Card';
 
 interface QuestionCardProps {
     question: Question;
+    onAnswer?: () => void;
 }
 
-export default function QuestionCard({ question }: QuestionCardProps) {
+export default function QuestionCard({ question, onAnswer }: QuestionCardProps) {
     const responses = useAssessmentStore((state) => state.responses);
     const updateResponse = useAssessmentStore((state) => state.updateResponse);
 
@@ -17,6 +18,9 @@ export default function QuestionCard({ question }: QuestionCardProps) {
 
     const handleChange = (value: number | string) => {
         updateResponse(question.id, value);
+        if (onAnswer) {
+            setTimeout(onAnswer, 200);
+        }
     };
 
     return (

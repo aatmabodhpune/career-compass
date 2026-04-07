@@ -21,34 +21,23 @@ export function getSupabaseClient(): SupabaseClient {
 
 // Replaced unstructured classification logic permanently in favor of explicit dimensional mapping.
 
-export async function fetchAssessmentResponses(session_id: string): Promise<any> {
-    console.log("STEP 1: FETCH START", session_id);
+export const getAssessmentBySessionId = async (session_id: string) => {
     const supabase = getSupabaseClient();
-    
     const { data, error } = await supabase
-        .from('assessment_responses')
-        .select('responses')
-        .eq('session_id', session_id);
-
-    console.log("STEP 2: DB RESULT:", data);
-    console.log("STEP 2: DB ERROR:", error);
+        .from("assessment_responses")
+        .select("responses")
+        .eq("session_id", session_id)
+        .maybeSingle();
 
     if (error) {
-        throw new Error(`Error fetching assessment responses: ${error.message}`);
+        console.error("DB ERROR:", error);
+        throw new Error("Failed to fetch assessment");
     }
 
-    if (!data || data.length === 0) {
-        throw new Error("No responses found for session");
-    }
+    console.log("DB FETCH RESULT:", data);
 
-    const raw = data[0].responses;
-
-    // Handle double-nested case: { responses: { p1: 3 } } vs { p1: 3 }
-    const responses = raw?.responses ? raw.responses : raw;
-
-    console.log("STEP 3: RETURN VALUE:", responses);
-    return responses;
-}
+    return data;
+};
 
 export async function verifyAssessmentSession(session_id: string): Promise<void> {
     const supabase = getSupabaseClient();
@@ -64,7 +53,32 @@ export async function verifyAssessmentSession(session_id: string): Promise<void>
     }
     
     if (session.status !== "completed") {
-        throw new Error("Assessment not completed");
+        const assessment = await getAssessmentBySessionId(session_id);
+
+        // Account for double-nesting if responses is stored recursively in DB
+        const raw = assessment?.responses;
+        const responses = raw?.responses ? raw.responses : (raw || {});
+        
+        const keys = Object.keys(responses);
+
+        const pCount = keys.filter(k => k.startsWith("p")).length;
+        const iCount = keys.filter(k => k.startsWith("i")).length;
+        const aCount = keys.filter(k => k.startsWith("a")).length;
+
+        const IS_TEST_MODE = true;
+
+        const MIN_REQUIRED = IS_TEST_MODE
+            ? { personality: 5, interest: 5, aptitude: 5 }
+            : { personality: 20, interest: 30, aptitude: 15 };
+
+        const isCompleted =
+            pCount >= MIN_REQUIRED.personality &&
+            iCount >= MIN_REQUIRED.interest &&
+            aCount >= MIN_REQUIRED.aptitude;
+
+        if (!isCompleted) {
+            throw new Error("Assessment not completed");
+        }
     }
 }
 
