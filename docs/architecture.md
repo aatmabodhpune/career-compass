@@ -196,3 +196,84 @@ Controller
 - Aptitude score may return 0 due to mapping/benchmark issue  
 - Does NOT affect pipeline execution  
 - Scheduled for Sprint 6  
+
+---
+
+## 🔷 UI Layer — Post Overhaul (Sprint 5)
+
+### Overview
+
+The UI layer has been upgraded to a modern, component-driven design system while preserving architectural boundaries.
+
+---
+
+### Structure
+
+UI  
+→ Zustand Store  
+→ API Layer  
+→ Edge Functions  
+→ Database  
+
+---
+
+### Key Characteristics
+
+- UI components are **pure and presentational**
+- No business logic exists in UI
+- No direct API calls inside components
+- All data is consumed via Zustand stores
+
+---
+
+### Component System
+
+Introduced reusable UI components:
+
+- Card  
+- Button  
+- ProgressBar  
+- PageHeader  
+- InputField  
+- LikertScale  
+- MCQOption  
+- SectionWrapper  
+
+All components:
+- Props-driven  
+- Stateless  
+- No side effects  
+
+---
+
+### UI Enhancements
+
+- Improved layout using grid system  
+- Enhanced typography and spacing  
+- Consistent navigation (Navbar)  
+- Assessment UI wrapped with structured layout  
+- Results page redesigned for clarity  
+
+---
+
+### Important Constraint
+
+UI strictly renders backend response:
+
+- No sorting  
+- No filtering  
+- No transformation  
+
+---
+
+### Status
+
+✔ UI overhaul complete  
+✔ Architecture preserved  
+✔ System stable  
+
+---
+
+### Next Phase
+
+Pixel-perfect alignment with Figma (Phase 7)
