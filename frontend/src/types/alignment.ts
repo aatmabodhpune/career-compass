@@ -32,13 +32,13 @@ export interface Report {
 }
 
 export interface AlignmentResponse {
-    overall_top_10: CareerScore[];
-    personality_top_10: CareerScore[];
-    interest_top_10: CareerScore[];
-    aptitude_top_10: CareerScore[];
-    insights: Insights;
-    career_details: CareerDetail[];
-    report: Report;
+    careers: CareerScore[];
+    personality_alignment: CareerScore[];
+    interest_alignment: CareerScore[];
+    aptitude_alignment: CareerScore[];
+    strengths: string[];
+    improvements: string[];
+    recommendations: string[];
 }
 
 export interface AlignmentApiResult {

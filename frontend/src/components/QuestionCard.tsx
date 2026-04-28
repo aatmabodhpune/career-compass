@@ -1,24 +1,40 @@
-import type { Question } from '../data/questions';
 import LikertScale from './LikertScale';
 import MCQOptions from './MCQOptions';
 import { useAssessmentStore } from '../store/assessmentStore';
 import { Card } from './ui/Card';
+
+type Question = {
+    id: string;
+    type: "personality" | "interest" | "aptitude";
+    question: string;
+    options?: (string | number | { id: string; image_url?: string })[];
+    image_url?: string;
+    correct_answer?: string;
+    section?: string;
+    image?: string;
+};
+
 
 interface QuestionCardProps {
     question: Question;
     onAnswer?: () => void;
 }
 
+const isValidImage = (src?: string) =>
+    typeof src === "string" && src.trim() !== "" && src.startsWith("http");
+
 export default function QuestionCard({ question, onAnswer }: QuestionCardProps) {
+    if (!question) return null;
+
     const responses = useAssessmentStore((state) => state.responses);
     const updateResponse = useAssessmentStore((state) => state.updateResponse);
 
-    const selectedValue = responses[question.id];
+    const selectedValue = responses[question.type]?.[question.id];
 
     const handleChange = (value: number | string) => {
         updateResponse(question.id, value);
         if (onAnswer) {
-            setTimeout(onAnswer, 200);
+            onAnswer();
         }
     };
 
@@ -29,9 +45,17 @@ export default function QuestionCard({ question, onAnswer }: QuestionCardProps) 
                     {question.section}
                 </span>
                 <h2 className="text-3xl md:text-4xl font-black text-gray-900 leading-tight">
-                    {question.question}
+                    {question.question || (question as any).text}
                 </h2>
-                {question.image && (
+                {isValidImage(question.image_url) && (
+                    <img
+                        src={question.image_url}
+                        loading="lazy"
+                        decoding="async"
+                        className="max-w-[200px] max-h-[200px] object-contain mx-auto mb-4 rounded-xl shadow-sm"
+                    />
+                )}
+                {question.image && !question.image_url && (
                     <div className="w-full max-w-sm mx-auto h-48 bg-gray-50/50 rounded-2xl flex items-center justify-center border border-dashed border-gray-200 p-6 text-center mt-6">
                         <span className="text-sm font-medium text-gray-400 italic">
                             [Visual Reference: {question.image}]
@@ -40,19 +64,18 @@ export default function QuestionCard({ question, onAnswer }: QuestionCardProps) 
                 )}
             </div>
             <div className="pt-4 flex justify-center w-full">
-                {question.type === 'likert' ? (
+                {question.type === "personality" || question.type === "interest" ? (
                     <LikertScale
-                        options={question.options}
                         selectedValue={selectedValue}
                         onChange={handleChange}
                     />
-                ) : (
+                ) : question.type === "aptitude" ? (
                     <MCQOptions
-                        options={question.options}
+                        options={question.options || []}
                         selectedValue={selectedValue}
                         onChange={handleChange}
                     />
-                )}
+                ) : null}
             </div>
         </Card>
     );

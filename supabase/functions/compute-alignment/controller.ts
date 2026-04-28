@@ -6,7 +6,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-export async function handleRequest(req: Request): Promise<Response> {
+export async function handleRequest(req: Request, supabase: any): Promise<Response> {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -65,14 +65,14 @@ export async function handleRequest(req: Request): Promise<Response> {
     console.log("Compute alignment started for session:", session_id);
 
     // Verify session exists and is completed — user context derived internally from DB
-    await verifyAssessmentSession(session_id);
+    await verifyAssessmentSession(session_id, supabase);
 
-    const result = await computeAlignmentService({ session_id });
+    const result = await computeAlignmentService({ session_id }, supabase);
     
     console.log("Compute alignment completed successfully for session:", session_id);
 
     return new Response(
-      JSON.stringify({ data: result, error: null }),
+      JSON.stringify(result),
       { 
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" }

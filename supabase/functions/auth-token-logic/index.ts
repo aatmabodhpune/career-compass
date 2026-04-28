@@ -1,5 +1,3 @@
-/// <reference lib="deno.ns" />
-
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const supabase = createClient(
@@ -36,13 +34,25 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
   try {
     // ✅ PARSE BODY
-    const body = await req.json();
+    let body;
+    try {
+      body = await req.json();
+    } catch {
+      return new Response(
+        JSON.stringify({ error: "Invalid JSON body" }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
     const token = body?.token;
 
     // ❌ VALIDATE TOKEN
     if (!token || typeof token !== "string" || token.trim() === "") {
       return new Response(
-        JSON.stringify({ data: null, error: "Token is required" }),
+        JSON.stringify({ error: "Token is required" }),
         {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -51,11 +61,13 @@ Deno.serve(async (req: Request): Promise<Response> => {
     }
 
     // ✅ CALL SERVICE
-    const { data, error } = await getStudentByToken(supabase, token.trim());
+    const authToken = token.trim();
+    const { data: student, error } = await getStudentByToken(supabase, authToken);
 
     if (error) {
+      console.error("Database error:", error);
       return new Response(
-        JSON.stringify({ data: null, error: "Internal server error" }),
+        JSON.stringify({ error: "Database query failed" }),
         {
           status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -63,9 +75,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    if (!data) {
+    if (!student) {
       return new Response(
-        JSON.stringify({ data: null, error: "Invalid token" }),
+        JSON.stringify({ error: "Invalid or expired token" }),
         {
           status: 401,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -73,20 +85,100 @@ Deno.serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    // ✅ EXTRACT STUDENT CONTEXT
-    const student_id = data.id;
-    const school_id = data.school_id;
+    const student_id = student.id;
+    const school_id = student.school_id;
 
-    // TODO: Enforce RLS using school_id for tenant isolation
+    if (!student_id) {
+      return new Response(
+        JSON.stringify({ error: "Student record is malformed" }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
 
-    // ✅ SUCCESS
+    // ✅ CHECK EXISTING SESSION
+    const { data: existing, error: existingError } = await supabase
+      .from("assessment_sessions")
+      .select("id")
+      .eq("student_id", student_id)
+      .eq("status", "in_progress")
+      .maybeSingle();
+
+    if (existingError) {
+      console.error("EXISTING SESSION CHECK ERROR:", existingError);
+    }
+
+    let session: { id: string };
+
+    if (existing) {
+      session = existing;
+      console.log("REUSING EXISTING SESSION:", session.id);
+    } else {
+      // ✅ CREATE NEW SESSION
+      const { data: newSession, error: sessionError } = await supabase
+        .from("assessment_sessions")
+        .insert({
+          student_id,
+          school_id,
+          status: "in_progress",
+          started_at: new Date().toISOString(),
+        })
+        .select()
+        .single();
+
+      console.log("SESSION INSERT RESULT:", newSession, sessionError);
+
+      if (sessionError || !newSession) {
+        return new Response(
+          JSON.stringify({
+            error: sessionError?.message || "Failed to initialize assessment session",
+          }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+
+      session = newSession;
+    }
+
+    // ✅ GENERATE JWT
+    const { data: jwtData, error: jwtError } =
+      await supabase.auth.signInAnonymously();
+
+    if (jwtError) {
+      console.error("ANON AUTH ERROR:", jwtError);
+    }
+
+    if (!jwtData?.session?.access_token) {
+      console.error("JWT DATA MISSING:", jwtData);
+
+      return new Response(
+        JSON.stringify({
+          error: "JWT generation failed",
+          details: jwtError?.message || "No session returned",
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    const jwt = jwtData.session.access_token;
+
     return new Response(
       JSON.stringify({
         data: {
-          id: data.id,
-          name: data.name,
-          grade: data.grade,
-          school_id: data.school_id,
+          id: student.id,
+          name: student.name,
+          grade: student.grade,
+          school_id: student.school_id,
+          session_id: session.id,
+          token: jwt,
         },
         error: null,
       }),
@@ -95,19 +187,20 @@ Deno.serve(async (req: Request): Promise<Response> => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       }
     );
-  } catch {
+  } catch (err) {
+    console.error("Critical function error:", err);
+
     return new Response(
-      JSON.stringify({ data: null, error: "Invalid JSON body" }),
+      JSON.stringify({ error: "An unexpected internal error occurred" }),
       {
-        status: 400,
+        status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       }
     );
   }
 });
 
-// TODO: Move to separate service file when using Supabase CLI
-
+// ✅ HELPER
 async function getStudentByToken(supabase: any, token: string) {
   const { data, error } = await supabase
     .from("students")

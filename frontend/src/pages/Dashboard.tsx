@@ -6,31 +6,59 @@ import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { PageHeader } from "../components/ui/PageHeader";
 
+type AssessmentSection = 'personality' | 'interest' | 'aptitude';
+
 export default function Dashboard() {
     const navigate = useNavigate();
     const { student, logout } = useAuthStore();
-    const { personality_done, interest_done, aptitude_done, responses } = useAssessmentStore();
-    
-    const allTestsDone = personality_done && interest_done && aptitude_done;
+    const { responses, status, setSection, setCurrentQuestionIndex } = useAssessmentStore();
+    console.log("RESPONSES STATE:", responses);
+    const isCompleted = status === 'completed';
+    const isPersonalityComplete = Object.keys(responses?.personality || {}).length > 0;
+    const isInterestComplete = Object.keys(responses?.interest || {}).length > 0;
+    const isAptitudeComplete = Object.keys(responses?.aptitude || {}).length > 0;
 
     const handleLogout = () => {
         logout();
         navigate("/login");
     };
 
-    const getStatusInfo = (isDone: boolean, section: string) => {
-        const inProgress = Object.keys(responses || {}).some(k => k && k.startsWith(section[0].toLowerCase()));
+    const hasResponsesForSection = (section: AssessmentSection) =>
+        Object.keys(responses?.[section] || {}).length > 0;
 
-        if (isDone) return { label: 'Completed', color: 'bg-green-100 text-green-800' };
+    const getStatusInfo = (isSectionComplete: boolean, section: AssessmentSection) => {
+        if (isCompleted || isSectionComplete) return { label: 'Completed', color: 'bg-green-100 text-green-800' };
+
+        const inProgress = hasResponsesForSection(section);
         if (inProgress) return { label: 'In Progress', color: 'bg-yellow-100 text-yellow-800' };
+        
         return { label: 'Not Started', color: 'bg-gray-100 text-gray-800' };
     };
 
-    const getBtnText = (isDone: boolean, section: string) => {
-        const inProgress = Object.keys(responses || {}).some(k => k && k.startsWith(section[0].toLowerCase()));
-        if (isDone) return "Retake";
+    const getBtnText = (section: AssessmentSection) => {
+        if (isCompleted) return "View Results";
+        
+        const inProgress = hasResponsesForSection(section);
         return inProgress ? "Continue" : "Start";
     };
+
+    const handleAction = (section: AssessmentSection) => {
+        if (isCompleted) {
+            console.log("Navigating to results");
+            navigate("/results");
+        } else {
+            setSection(section);
+            setCurrentQuestionIndex(0);
+            navigate("/assessment", {
+                state: {
+                    section,
+                    showIntro: !hasResponsesForSection(section)
+                }
+            });
+        }
+    };
+
+    const allTestsDone = isPersonalityComplete && isInterestComplete && isAptitudeComplete;
 
     return (
         <Container className="py-8 space-y-8 animate-in fade-in duration-700 max-w-4xl">
@@ -50,51 +78,67 @@ export default function Dashboard() {
                     <div>
                         <h2 className="text-xl font-bold text-gray-900 mb-2">Personality Test</h2>
                         <p className="text-sm text-gray-600 mb-4">Discover your core traits and behaviors.</p>
-                        <span className={`inline-block px-3 py-1 text-xs font-medium rounded-full mb-6 ${getStatusInfo(personality_done, 'personality').color}`}>
-                            {getStatusInfo(personality_done, 'personality').label}
+                        <span className={`inline-block px-3 py-1 text-xs font-medium rounded-full mb-6 ${getStatusInfo(isPersonalityComplete, 'personality').color}`}>
+                            {getStatusInfo(isPersonalityComplete, 'personality').label}
                         </span>
                     </div>
-                    <Button onClick={() => navigate("/test/personality")} className="w-full justify-center">
-                        {getBtnText(personality_done, 'personality')}
-                    </Button>
+                    {!isPersonalityComplete && (
+                        <Button 
+                            onClick={() => handleAction('personality')} 
+                            className="w-full justify-center"
+                        >
+                            {getBtnText('personality')}
+                        </Button>
+                    )}
                 </Card>
 
                 <Card className="flex flex-col h-full justify-between p-6">
                     <div>
                         <h2 className="text-xl font-bold text-gray-900 mb-2">Interest Test</h2>
                         <p className="text-sm text-gray-600 mb-4">Identify what careers excite you.</p>
-                        <span className={`inline-block px-3 py-1 text-xs font-medium rounded-full mb-6 ${getStatusInfo(interest_done, 'interest').color}`}>
-                            {getStatusInfo(interest_done, 'interest').label}
+                        <span className={`inline-block px-3 py-1 text-xs font-medium rounded-full mb-6 ${getStatusInfo(isInterestComplete, 'interest').color}`}>
+                            {getStatusInfo(isInterestComplete, 'interest').label}
                         </span>
                     </div>
-                    <Button onClick={() => navigate("/test/interest")} className="w-full justify-center">
-                        {getBtnText(interest_done, 'interest')}
-                    </Button>
+                    {!isInterestComplete && (
+                        <Button 
+                            onClick={() => handleAction('interest')} 
+                            className="w-full justify-center"
+                        >
+                            {getBtnText('interest')}
+                        </Button>
+                    )}
                 </Card>
 
                 <Card className="flex flex-col h-full justify-between p-6">
                     <div>
                         <h2 className="text-xl font-bold text-gray-900 mb-2">Aptitude Test</h2>
                         <p className="text-sm text-gray-600 mb-4">Measure your natural abilities.</p>
-                        <span className={`inline-block px-3 py-1 text-xs font-medium rounded-full mb-6 ${getStatusInfo(aptitude_done, 'aptitude').color}`}>
-                            {getStatusInfo(aptitude_done, 'aptitude').label}
+                        <span className={`inline-block px-3 py-1 text-xs font-medium rounded-full mb-6 ${getStatusInfo(isAptitudeComplete, 'aptitude').color}`}>
+                            {getStatusInfo(isAptitudeComplete, 'aptitude').label}
                         </span>
                     </div>
-                    <Button onClick={() => navigate("/test/aptitude")} className="w-full justify-center">
-                        {getBtnText(aptitude_done, 'aptitude')}
-                    </Button>
+                    {allTestsDone || isCompleted ? (
+                        <Button 
+                            onClick={() => {
+                                console.log("CLICK RESULTS");
+                                navigate("/results");
+                            }} 
+                            className="w-full justify-center"
+                        >
+                            View Results
+                        </Button>
+                    ) : (
+                        !isAptitudeComplete && (
+                            <Button 
+                                onClick={() => handleAction('aptitude')} 
+                                className="w-full justify-center"
+                            >
+                                {getBtnText('aptitude')}
+                            </Button>
+                        )
+                    )}
                 </Card>
-            </div>
-
-            <div className="mt-8 flex justify-center">
-                <Button 
-                    disabled={!allTestsDone} 
-                    onClick={() => navigate("/profile")}
-                    className="w-full max-w-md"
-                    size="lg"
-                >
-                    View Profile
-                </Button>
             </div>
         </Container>
     );

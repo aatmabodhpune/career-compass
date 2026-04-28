@@ -10,12 +10,12 @@ import { PageHeader } from "../components/ui/PageHeader";
 import { useAssessmentStore } from "../store/assessmentStore";
 
 export default function Login() {
-    const [token, setToken] = useState("");
+    const [token, setInputToken] = useState("");
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const { setStudent, setToken: setStoreToken } = useAuthStore();
-    const { startSession, resetSession } = useAssessmentStore();
+    const { setStudent, setAuth } = useAuthStore();
+    const { resetSession } = useAssessmentStore();
     const navigate = useNavigate();
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -30,29 +30,48 @@ export default function Login() {
 
         try {
             const data = await loginWithToken(token);
+            console.log("LOGIN RESPONSE:", JSON.stringify(data));
 
             if (data.error) {
                 setError(data.error);
                 return;
             }
 
-            if (data.student) {
-                setStudent(data.student);
+            const user = data.data;
+            if (!user?.session_id || !user.token) {
+                console.error("BACKEND RESPONSE:", data);
+                throw new Error("AUTH DATA MISSING");
             }
 
             // Ensure previous assessment session state is fully cleared on new login
             resetSession();
-            setStoreToken(token);
 
-            // ✅ FIX: Start session and redirect to demographics immediately
-            try {
-                await startSession(token);
+            const inputToken = token.trim();
+
+            setStudent({
+                id: user.id,
+                name: user.name,
+                grade: user.grade,
+                school_id: user.school_id,
+            });
+            setAuth({
+                token: inputToken,
+                session_id: user.session_id,
+                jwt: user.token,
+            });
+            console.log("SESSION FROM BACKEND:", user.session_id);
+
+            console.log("AUTH SETUP COMPLETE - Token type:", typeof inputToken, "SessionID:", user.session_id);
+
+            if (!user.grade || !user.name) {
                 navigate("/demographics", { replace: true });
-            } catch (err) {
-                console.error("Failed to start session:", err);
-                // Even on session failure, we navigate to let rehydration/App-level logic try again if appropriate
-                navigate("/demographics", { replace: true });
+            } else {
+                navigate("/dashboard", { replace: true });
             }
+        } catch (err) {
+            const message = err instanceof Error ? err.message : "Login failed";
+            setError(message);
+            throw err;
         } finally {
             setLoading(false);
         }
@@ -75,7 +94,7 @@ export default function Login() {
                         id="token"
                         type="text"
                         value={token}
-                        onChange={(e) => setToken(e.target.value)}
+                        onChange={(e) => setInputToken(e.target.value)}
                         placeholder="e.g. COMPASS-XXXX-XXXX"
                         disabled={loading}
                         error={error || undefined}

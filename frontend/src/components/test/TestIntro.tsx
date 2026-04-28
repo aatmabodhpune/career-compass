@@ -6,17 +6,15 @@ import { Container } from '../layout/Container';
 interface TestIntroProps {
     title: string;
     description: string;
-    duration?: string;
     totalQuestions?: number;
     onStart: () => void;
 }
 
-export function TestIntro({ 
-    title, 
-    description, 
-    duration, 
-    totalQuestions, 
-    onStart 
+export function TestIntro({
+    title,
+    description,
+    totalQuestions,
+    onStart
 }: TestIntroProps) {
     return (
         <Container className="py-12 flex items-center justify-center min-h-[80vh] animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -36,28 +34,21 @@ export function TestIntro({
                         </p>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4 py-6 border-y border-gray-50">
+                    <div className="py-6 border-y border-gray-50">
                         <div className="text-center space-y-1">
-                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Duration</p>
-                            <p className="text-xl font-bold text-teal-600">{duration || '—'}</p>
-                        </div>
-                        <div className="text-center space-y-1 border-l border-gray-50">
                             <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Questions</p>
-                            <p className="text-xl font-bold text-teal-600">{totalQuestions || '—'}</p>
+                            <p className="text-3xl font-bold text-teal-600">{totalQuestions || 0}</p>
                         </div>
                     </div>
 
                     <div className="space-y-4">
-                        <Button 
-                            onClick={onStart} 
+                        <Button
+                            onClick={onStart}
                             className="w-full justify-center h-14 text-lg font-black tracking-wide"
                             size="lg"
                         >
-                            Start Assessment
+                            Start Test
                         </Button>
-                        <p className="text-center text-xs text-gray-400 font-bold uppercase tracking-widest leading-none">
-                            You cannot pause once the test begins
-                        </p>
                     </div>
                 </SectionWrapper>
             </Card>

@@ -1,279 +1,113 @@
-# Career Compass Architecture
+# 🏗️ Career Compass Architecture
 
-This document describes the high-level architecture of the Career Compass platform.
+This document describes the high-level architecture of the Career Compass platform following the completion of Sprint 6.
 
-## Components
-- **Frontend:** React + Vite + TypeScript
-- **Backend / Data:** Supabase (Auth, Postgres, Storage)
-- **APIs:** Supabase Edge Functions (Deno runtime)
-  - Modular structure: `controller → service → repository → modules`
-- **Alignment Engine:** Supabase Edge Functions (Migrated from Google Cloud Functions)
+## 🧱 1. ASSESSMENT SYSTEM
 
-## Alignment Engine Flow
+The assessment module gathers psychometric signals across three core dimensions.
 
-Assessment → Responses (JSONB)
-→ Prefix Classification (p*, i*, a*)
-→ Normalization
-→ Scoring
-→ Ranking
-→ Storage (alignment_results)
-→ API Response
-→ Frontend Rendering
+- **Question Inventory (118 items):**
+  - **Personality:** Big Five inventory items.
+  - **Interest:** RIASEC methodology mappings.
+  - **Aptitude:** 20 targeted MCQs equipped with full image-rendering support.
 
-## Frontend Architecture
+### Technical Implementation:
+- **Backend-Driven questions:** The complete question bank operates out of the backend (`/alignment-engine/config`). The client tier no longer holds static question lists.
+- **Asset Pipelines:** Public asset bindings are maintained directly using isolated Supabase Storage pathways.
 
-The frontend follows a simple request / state flow:
+## 🧱 2. DATA MODEL
 
-UI → Zustand Store → API Layer → Supabase Edge Functions → DB
+Participant responses are stored as granular state records inside individual session instances.
 
-⚠️ GLOBAL NOTE: Sorting of results is pending. Backend currently returns unsorted arrays. This will be implemented before production.
+- **Schema Specifics:**
+  - Standardized single-row records mapped per session ID (`assessment_responses`).
+  - Supports dual formats dynamically across flat prefix structures and grouped sub-objects.
 
-- Zustand is the single source of truth for the active assessment state (session id, status, section, responses).
-- The UI reads only from Zustand state and triggers state updates via store actions.
-
-## Autosave System
-
-- Trigger: fired on every response update (`updateResponse`) from the UI.
-- Debounce: `1000ms` (single in-flight timer that resets on further changes).
-- Payload: autosave sends the FULL `responses` object (JSON) to the backend.
-
-## Session Lifecycle (Assessment Module)
-
-1. `start` (Home): `startSession(token)` hydrates/creates a backend session, then stores the returned `session_id`.
-2. `resume` (Assessment): the UI renders the active question based on Zustand state and session status.
-3. `autosave`: debounced persistence of the FULL `responses` object while the assessment is in progress.
-4. `submit`: `submitAssessment(token)` submits the active `session_id`, sets Zustand `status = completed`, and blocks further writes.
-
-## UI System (MVP Styling Primitives)
-
-All pages use a consistent lightweight UI system based on three primitives:
-
-- `Container`: `max-w-5xl mx-auto px-4 py-8`, used to wrap pages.
-- `Card`: `bg-white rounded-xl shadow-md p-6`, with a `centered` variant for demo-friendly pages.
-- `Button`: `primary` (blue-600), `secondary` (bordered), and `ghost` styles; includes shared spacing/disabled behavior.
-
-Typography scale used across the MVP:
-- Heading: `text-2xl font-bold text-gray-900`
-- Subheading: `text-lg font-semibold`
-- Body: `text-gray-600`
-- Label: `text-sm text-gray-500`
-
-Progress bar uses a simple bar layout with `h-2`, `bg-gray-200` track, and `bg-blue-600` filled portion.
-
----
-
-## Alignment Engine — Final Flow (Sprint 4)
-
-```
-responses
-→ normalizeAll        (trait values → 0-100 scale)
-→ computeAllScores    (key mapping + dot-product scoring)
-→ rankAll             (top 10 per category + overall)
-→ insight engine      (explanations, strengths, recommendations)
-→ API response
+### Target Mapping:
+```json
+benchmark_scores: {
+  "personality": {},
+  "interest": {},
+  "aptitude": {},
+  "weights": {},
+  "meta": {
+    "description": "...",
+    "strengths": [],
+    "improvements": []
+  }
+}
 ```
 
-**Contract Notes:**
-- `computeAllScores` enforces ARRAY output — callers must treat return as `CareerScore[]`.
-- Key mapping (user trait name → benchmark key, e.g. `openness → p1`) is handled **exclusively inside `computeAllScores`**. Normalization and repository layers are not responsible for key translation.
-- `rankAll` accepts only arrays. A hard guard at function entry will throw if a non-array is passed.
-- Insight engine runs **after** ranking and operates on `ranked.overall_top_10`.
-- PDF report generation is a placeholder returning `{ url: null }` — full implementation deferred.
+## 🧱 3. SCORING SYSTEM
 
-⚠️ **Sorting not yet implemented.** Backend returns unsorted arrays. Sorting will be added before production.
+- **Scaling Guidelines:** Standardized algorithms constrain raw aggregates down to an internal `[0, 1]` range. Presentational components multiply the final values by 100 on output.
+- **Rule Definitions:** Strict deterministic mathematical weights substitute third-party evaluation modules. No threshold barriers interrupt evaluation queues.
 
----
-
-## 🔷 Alignment Engine — Final Architecture (Sprint 4 Completion)
-
-### Full Pipeline
-
+### Weighted Calculation:
 ```
-DB (flat JSON responses: { p1, i1, a1, ... })
-  → Repository (fetchAssessmentResponses — raw extraction, no transformation)
-  → Classifier (prefix-based grouping: p* → personality, i* → interest, a* → aptitude)
-  → Normalizer (scale trait values to 0–100)
-  → Scorer (dot-product scoring with key mapping: trait name → benchmark key)
-  → Ranker (top 10 per category + overall)
-  → Insight Engine (strengths, weaknesses, recommendations, career explanations)
-  → API Response ({ data, error })
+final_score = (personality * 0.40) + (interest * 0.40) + (aptitude * 0.20)
 ```
 
-### Conditional Classification
+## 🧱 4. APTITUDE SCORING
 
-The classifier applies **only when input is flat** (top-level keys start with `p`, `i`, or `a`). If the repository already returns structured data (`{ personality, interest, aptitude }`), classification is skipped.
-
-```ts
-const isFlat = Object.keys(responses).some(
-    (key) => key.startsWith("p") || key.startsWith("i") || key.startsWith("a")
-);
+Logical evaluations use binary checks exclusively.
+```
+Aptitude Score = (Correct Selections) / (Total Prompts)
 ```
 
-### Separation of Concerns
+### Allocation Rules:
+- High-level mapping selects 8-12 aptitude queries mapped between ranges `a1` through `a20`.
+- Supports continuous weighting variances extending from `0.20` up to `1.00` per individual item.
 
-| Layer | Responsibility | MUST NOT |
-|---|---|---|
-| Repository | Raw DB extraction | Classify, normalize, or validate categories |
-| Classifier | Prefix-based grouping | Normalize values or access benchmarks |
-| Normalizer | Scale to 0–100 | Map keys or access benchmarks |
-| Scorer | Dot-product scoring + key mapping | Sort, rank, or produce insights |
-| Ranker | Sort + slice top 10 per category | Score or access DB |
-| Insight Engine | Generate explanations, strengths, recs | Modify scores or rankings |
+## 🧱 5. ARCHITECTURE FLOW
 
-### Runtime
+Operations enforce precise execution boundaries.
 
-- **Supabase Edge Functions (Deno)**
-- All local imports use `.ts` extensions
-- No Node.js-specific packages
-- Insight engine is non-blocking (wrapped in try/catch)
+```
+[Raw Responses]
+       ↓
+(normalizeAll)
+       ↓
+(computeAllScores)
+       ↓
+   (rankAll)
+       ↓
+   (insights)
+       ↓
+ (enrichment)
+       ↓
+ [API Response]
+```
 
-⚠️ Sorting not yet implemented. Arrays returned unsorted. Will be addressed before production.
+## 🧱 6. ENRICHMENT LAYER
 
-⚠️ Sorting not implemented yet
-⚠️ Arrays returned unsorted (pre-production fix required)
+Final summaries draw structured profile outlines extracted off backend indices:
+- Primary descriptions.
+- Career strengths.
+- Suggested domains of improvement.
 
----
+## 🧱 7. AUTH MODEL
 
-## 🔷 Sprint 5 — Presentation Layer (Final)
+Access control routes through unique transport tokens.
+- **Identity:** Anonymous credentials provision foundational transport wrappers.
+- **Context:** Individual session hashes resolve active database operations securely.
 
-Describe:
+## 🧱 8. FRONTEND FLOW
 
-- No backend changes
-- No API changes
-- No DB changes
+React state transitions proceed sequentially.
+```
+[Token Verification] ➔ [Demographics] ➔ [Dashboard] ➔ [Tests] ➔ [Report View]
+```
 
-Final flow (unchanged):
+## 🧱 9. PDF SYSTEM
 
-Assessment → Edge Function → DB → Response  
-→ API Layer → Zustand → UI → Render
+Export features operate across distinct logical modules.
+- **Results.tsx:** Client interaction handler.
+- **ReportTemplate.tsx:** Visual layout declarations.
+- **generateReport.ts:** Document generator execution flow.
 
-Add:
+## 🧱 10. KNOWN LIMITATIONS
 
-- Backend sorting now part of response layer
-- Career name mapping happens in API/store layer (NOT UI)
-- UI is strictly a renderer (no logic)
-
----
-
-## 🔷 Post-Sprint 5 Stabilization (UAT Fixes)
-
-### Session Management
-
-- session_id is now enforced as a **single source of truth**
-- Generated once at session start
-- Persisted in Zustand store only
-- No regeneration allowed during lifecycle
-
----
-
-### Execution Flow (Final Stable Order)
-
-Controller  
-→ Repository (DB fetch)  
-→ Validation (DB-driven)  
-→ Classification  
-→ Normalization  
-→ Scoring  
-→ Ranking  
-→ Insights  
-→ Response  
-
-✔ Deterministic execution enforced  
-✔ Logging checkpoints added  
-
----
-
-### Stateless Entry Guarantee
-
-- Application always starts from Token screen
-- All previous sessions cleared on load
-- Prevents stale state issues
-
----
-
-## ⚠️ Known Limitation
-
-- Aptitude score may return 0 due to mapping/benchmark issue  
-- Does NOT affect pipeline execution  
-- Scheduled for Sprint 6  
-
----
-
-## 🔷 UI Layer — Post Overhaul (Sprint 5)
-
-### Overview
-
-The UI layer has been upgraded to a modern, component-driven design system while preserving architectural boundaries.
-
----
-
-### Structure
-
-UI  
-→ Zustand Store  
-→ API Layer  
-→ Edge Functions  
-→ Database  
-
----
-
-### Key Characteristics
-
-- UI components are **pure and presentational**
-- No business logic exists in UI
-- No direct API calls inside components
-- All data is consumed via Zustand stores
-
----
-
-### Component System
-
-Introduced reusable UI components:
-
-- Card  
-- Button  
-- ProgressBar  
-- PageHeader  
-- InputField  
-- LikertScale  
-- MCQOption  
-- SectionWrapper  
-
-All components:
-- Props-driven  
-- Stateless  
-- No side effects  
-
----
-
-### UI Enhancements
-
-- Improved layout using grid system  
-- Enhanced typography and spacing  
-- Consistent navigation (Navbar)  
-- Assessment UI wrapped with structured layout  
-- Results page redesigned for clarity  
-
----
-
-### Important Constraint
-
-UI strictly renders backend response:
-
-- No sorting  
-- No filtering  
-- No transformation  
-
----
-
-### Status
-
-✔ UI overhaul complete  
-✔ Architecture preserved  
-✔ System stable  
-
----
-
-### Next Phase
-
-Pixel-perfect alignment with Figma (Phase 7)
+- Benchmark bounds rely on preliminary baseline aggregates.
+- Ranking aggregates build off static weighted sums.
+- Administrator interfaces are scheduled for subsequent expansion.

@@ -1,11 +1,20 @@
 export interface Student {
+    id?: string;
     name: string;
     grade: number;
+    school_id?: string;
     school_name?: string | null;
 }
 
 export interface AuthResponse {
-    success: boolean;
-    data: Student | null;
-    error: string | null;
+    student?: Student | null;
+    data?: {
+        id: string;
+        name: string;
+        grade: number;
+        school_id: string;
+        session_id: string;
+        token: string;
+    } | null;
+    error?: string | null;
 }

@@ -1,37 +1,89 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { validateToken } from "../utils/auth.util.ts";
+export async function submitAssessment(payload: any, supabase: any) {
+    // 1. Verify payload shape
+    const { session_id } = payload;
+    
+    if (!session_id) {
+        const reason = "Missing session_id in payload";
+        console.error("SUBMIT FAILURE REASON:", reason);
+        return { data: null, error: reason };
+    }
 
-const supabase = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-);
-
-export async function submitAssessment(token: string, session_id: string) {
-    if (!token || !session_id) return { data: null, error: "Token and session_id are required" };
-
-    const student = await validateToken(token);
-    if (!student) return { data: null, error: "Invalid token" };
-
-    // TODO: Enforce RLS using school_id
-    const { id: student_id, school_id } = student;
-
-    const { data: session, error: sessErr } = await supabase
+    // 2. Verify session exists
+    const { data: sessionData, error: sessErr } = await supabase
         .from("assessment_sessions")
-        .select("status")
+        .select("student_id, school_id, status")
         .eq("id", session_id)
-        .eq("student_id", student_id)
-        .eq("school_id", school_id)
         .maybeSingle();
 
-    if (sessErr || !session) return { data: null, error: "Invalid session ownership" };
-    if (session.status === "completed") return { data: null, error: "Assessment already submitted" };
+    console.log("SESSION LOOKUP:", session_id, sessionData);
 
+    if (sessErr || !sessionData) {
+        const reason = "Session not found or invalid ownership";
+        console.error("SUBMIT FAILURE REASON:", reason);
+        return { data: null, error: "Invalid session ownership" };
+    }
+
+    if (sessionData.status === "completed") {
+        const reason = "Session is already marked as completed";
+        console.error("SUBMIT FAILURE REASON:", reason);
+        return { data: null, error: "Assessment already submitted" };
+    }
+
+    // 3. Verify responses retrieval
+    const { data: responseRecord, error: respErr } = await supabase
+        .from("assessment_responses")
+        .select("responses")
+        .eq("session_id", session_id)
+        .maybeSingle();
+
+    if (respErr || !responseRecord) {
+        const reason = "No responses found in database to submit";
+        console.error("SUBMIT FAILURE REASON:", reason);
+        return { data: null, error: "No responses found to submit" };
+    }
+
+    const responses = responseRecord.responses || {};
+    console.log("RESPONSES FROM DB:", responses);
+
+    // 4. Validate response structure compatibility
+    const isNested = responses.personality || responses.interest || responses.aptitude;
+
+    let pCount = 0;
+    let iCount = 0;
+    let aCount = 0;
+
+    if (isNested) {
+        pCount = Object.keys(responses.personality || {}).length;
+        iCount = Object.keys(responses.interest || {}).length;
+        aCount = Object.keys(responses.aptitude || {}).length;
+    } else {
+        const keys = Object.keys(responses || {});
+        pCount = keys.filter(k => k.startsWith("p")).length;
+        iCount = keys.filter(k => k.startsWith("i")).length;
+        aCount = keys.filter(k => k.startsWith("a")).length;
+    }
+
+    // 5. Log validation counts
+    console.log("VALIDATION COUNTS:", { pCount, iCount, aCount, required: { personality: 5, interest: 5, aptitude: 5 } });
+
+    // Validate minimum thresholds
+    if (pCount < 5 || iCount < 5 || aCount < 5) {
+        const reason = `Assessment not completed. Short of required counts.`;
+        console.error("SUBMIT FAILURE REASON:", reason);
+        return { data: null, error: "Assessment not completed" };
+    }
+
+    // Update status to completed
     const { error: updateErr } = await supabase
         .from("assessment_sessions")
         .update({ status: "completed", completed_at: new Date().toISOString() })
         .eq("id", session_id);
 
-    if (updateErr) return { data: null, error: "Failed to close session" };
+    if (updateErr) {
+        const reason = "Failed to update session status to completed: " + updateErr.message;
+        console.error("SUBMIT FAILURE REASON:", reason);
+        return { data: null, error: "Failed to close session" };
+    }
 
-    return { data: { success: true }, error: null };
+    return { data: { session_id }, error: null };
 }

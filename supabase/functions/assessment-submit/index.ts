@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { submitAssessment } from "./services/assessment-submit.service.ts";
 
 const corsHeaders = {
@@ -17,8 +18,25 @@ serve(async (req: Request) => {
     }
 
     try {
-        const { token, session_id } = await req.json();
-        const result = await submitAssessment(token, session_id);
+        const body = await req.json();
+        console.log("SUBMIT BODY:", body);
+
+        const authHeader = req.headers.get("Authorization");
+        console.log("AUTH HEADER:", authHeader);
+
+        const supabase = createClient(
+            Deno.env.get("SUPABASE_URL")!,
+            Deno.env.get("SUPABASE_ANON_KEY")!,
+            {
+                global: {
+                    headers: {
+                        Authorization: authHeader || "",
+                    },
+                },
+            }
+        );
+
+        const result = await submitAssessment(body, supabase);
 
         return new Response(JSON.stringify(result), {
             status: result.error ? 400 : 200,

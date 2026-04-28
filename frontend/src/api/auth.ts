@@ -22,17 +22,8 @@ export async function loginWithToken(rawToken: string): Promise<AuthResponse> {
         });
 
         if (!response.ok) {
-            let errorMsg = `Server error: ${response.status} ${response.statusText}`;
-            try {
-                // Attempt to parse formal backend error messages
-                const errorBody = await response.json();
-                if (errorBody && errorBody.error) {
-                    errorMsg = errorBody.error;
-                }
-            } catch (e) {
-                // Fallback to standard HTTP status if non-JSON backend error
-            }
-            throw new Error(errorMsg);
+            const err = await response.json().catch(() => ({ error: 'Login failed' }));
+            throw new Error(err.error || 'Login failed');
         }
 
         return await response.json();

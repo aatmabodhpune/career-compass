@@ -1,11 +1,4 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const supabase = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-);
-
-export async function validateToken(token: string) {
+export async function validateToken(token: string, supabase: any) {
     if (!token) return null;
     const { data, error } = await supabase
         .from("students")

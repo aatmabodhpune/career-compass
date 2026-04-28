@@ -1,38 +1,51 @@
 import React from "react";
 
+// ── Types aligned to new API contract ────────────────────────────────────────
+
 type Career = {
   career_name: string;
-  match_score: number;
+  final_score: number;
   personality_score: number;
   interest_score: number;
   aptitude_score: number;
 };
 
-type Insights = {
-  strengths: string[];
-  weaknesses: string[];
-  recommendations: string[];
+type AlignmentEntry = {
+  career_name: string;
+  personality_score: number;
+  interest_score: number;
+  aptitude_score: number;
 };
 
 type CareerDetail = {
-  career_name: string;
-  explanation: string;
+  career_id: string;
+  description: string;
   strengths: string[];
-  weaknesses: string[];
+  improvements: string[];
 };
 
 type ReportProps = {
   careers: Career[];
-  insights: Insights;
-  details: CareerDetail[];
+  strengths: string[];
+  improvements: string[];
+  recommendations: string[];
+  personalityAlignment?: AlignmentEntry[];
+  interestAlignment?: AlignmentEntry[];
+  aptitudeAlignment?: AlignmentEntry[];
+  careerDetails?: CareerDetail[];
 };
 
 export const ReportTemplate: React.FC<ReportProps> = ({
   careers,
-  insights,
-  details,
+  strengths,
+  improvements,
+  recommendations,
+  personalityAlignment = [],
+  interestAlignment = [],
+  aptitudeAlignment = [],
+  careerDetails = [],
 }) => {
-  const topCareers = careers.slice(0, 5);
+  const top5Careers = (careers || []).slice(0, 5);
 
   const colors = {
     primary: "#0D9488",
@@ -59,7 +72,7 @@ export const ReportTemplate: React.FC<ReportProps> = ({
     },
     title: {
       fontSize: "32px",
-      fontWeight: "bold",
+      fontWeight: "bold" as const,
       margin: "0 0 8px 0",
       color: colors.textPrimary,
     },
@@ -70,7 +83,7 @@ export const ReportTemplate: React.FC<ReportProps> = ({
     },
     sectionTitle: {
       fontSize: "22px",
-      fontWeight: "bold",
+      fontWeight: "bold" as const,
       color: colors.textPrimary,
       marginBottom: "20px",
       marginTop: "40px",
@@ -92,12 +105,12 @@ export const ReportTemplate: React.FC<ReportProps> = ({
     },
     careerName: {
       fontSize: "20px",
-      fontWeight: "bold",
+      fontWeight: "bold" as const,
       margin: "0",
     },
     matchScore: {
       fontSize: "24px",
-      fontWeight: "bold",
+      fontWeight: "bold" as const,
       color: colors.primary,
       margin: "0",
     },
@@ -125,7 +138,7 @@ export const ReportTemplate: React.FC<ReportProps> = ({
       gap: "6px",
     },
     statValue: {
-      fontWeight: "bold",
+      fontWeight: "bold" as const,
       color: colors.textPrimary,
     },
     divider: {
@@ -135,7 +148,7 @@ export const ReportTemplate: React.FC<ReportProps> = ({
     },
     subSectionTitle: {
       fontSize: "18px",
-      fontWeight: "bold",
+      fontWeight: "bold" as const,
       marginBottom: "12px",
       marginTop: "0",
       color: colors.textPrimary,
@@ -150,19 +163,6 @@ export const ReportTemplate: React.FC<ReportProps> = ({
       color: colors.textSecondary,
       lineHeight: "1.6",
     },
-    detailName: {
-      fontSize: "20px",
-      fontWeight: "bold",
-      marginBottom: "10px",
-      color: colors.textPrimary,
-      marginTop: 0,
-    },
-    detailDesc: {
-      fontSize: "15px",
-      color: colors.textSecondary,
-      marginBottom: "15px",
-      lineHeight: "1.6",
-    },
     alignmentRow: {
       display: "flex",
       justifyContent: "space-between",
@@ -170,6 +170,11 @@ export const ReportTemplate: React.FC<ReportProps> = ({
       borderBottom: `1px solid ${colors.border}`,
       fontSize: "15px",
     },
+  };
+
+  const formatPercent = (val: number) => {
+      const v = Number.isFinite(val) ? val : 0;
+      return Math.round(Math.max(0, v) * 100);
   };
 
   return (
@@ -184,135 +189,159 @@ export const ReportTemplate: React.FC<ReportProps> = ({
 
       {/* 2. TOP CAREERS */}
       <h2 style={styles.sectionTitle}>Top Career Matches</h2>
-      {topCareers.map((career, index) => (
+      {top5Careers.map((career, index) => (
         <div key={index} style={styles.card}>
           <div style={styles.careerNameRow}>
             <p style={styles.careerName}>{career.career_name}</p>
-            <p style={styles.matchScore}>{Math.round(career.match_score)}%</p>
+            <p style={styles.matchScore}>{formatPercent(career.final_score)}%</p>
           </div>
           
           <div style={styles.progressBarBg}>
-            <div style={{ ...styles.progressBarFill, width: `${Math.round(Math.max(0, Math.min(100, career.match_score)))}%` }} />
+            <div style={{ ...styles.progressBarFill, width: `${Math.min(100, formatPercent(career.final_score))}%` }} />
           </div>
 
           <div style={styles.statsRow}>
             <div style={styles.statItem}>
               <span>Personality:</span>
-              <span style={styles.statValue}>{Math.round(career.personality_score)}%</span>
+              <span style={styles.statValue}>{formatPercent(career.personality_score)}%</span>
             </div>
             <div style={styles.divider} />
             <div style={styles.statItem}>
               <span>Interest:</span>
-              <span style={styles.statValue}>{Math.round(career.interest_score)}%</span>
+              <span style={styles.statValue}>{formatPercent(career.interest_score)}%</span>
             </div>
             <div style={styles.divider} />
             <div style={styles.statItem}>
               <span>Aptitude:</span>
-              <span style={styles.statValue}>{Math.round(career.aptitude_score ?? 0)}%</span>
+              <span style={styles.statValue}>{formatPercent(career.aptitude_score)}%</span>
             </div>
           </div>
         </div>
       ))}
 
-      {/* 3. ALIGNMENT SECTIONS */}
-      <h2 style={styles.sectionTitle}>Alignment Breakdowns</h2>
-      
-      <div style={styles.card}>
-        <h3 style={styles.subSectionTitle}>Personality Alignment</h3>
-        {topCareers.map((c, i) => (
-            <div key={i} style={{...styles.alignmentRow, borderBottom: i === topCareers.length - 1 ? "none" : styles.alignmentRow.borderBottom}}>
-                <span style={{ fontWeight: "bold", color: colors.textSecondary }}>{c.career_name}</span>
-                <span style={styles.statValue}>{Math.round(c.personality_score)}%</span>
-            </div>
-        ))}
-      </div>
+      {/* 3. ALIGNMENT BREAKDOWNS */}
+      {(personalityAlignment.length > 0 || interestAlignment.length > 0 || aptitudeAlignment.length > 0) && (
+        <>
+          <h2 style={styles.sectionTitle}>Alignment Breakdowns</h2>
 
-      <div style={styles.card}>
-        <h3 style={styles.subSectionTitle}>Interest Alignment</h3>
-        {topCareers.map((c, i) => (
-            <div key={i} style={{...styles.alignmentRow, borderBottom: i === topCareers.length - 1 ? "none" : styles.alignmentRow.borderBottom}}>
-                <span style={{ fontWeight: "bold", color: colors.textSecondary }}>{c.career_name}</span>
-                <span style={styles.statValue}>{Math.round(c.interest_score)}%</span>
+          {personalityAlignment.length > 0 && (
+            <div style={styles.card}>
+              <h3 style={styles.subSectionTitle}>Personality Alignment</h3>
+              {personalityAlignment.slice(0, 5).map((c, i) => (
+                <div key={i} style={{ ...styles.alignmentRow, borderBottom: i === Math.min(personalityAlignment.length, 5) - 1 ? "none" : styles.alignmentRow.borderBottom }}>
+                  <span style={{ fontWeight: "bold", color: colors.textSecondary }}>{c.career_name}</span>
+                  <span style={styles.statValue}>{formatPercent(c.personality_score)}%</span>
+                </div>
+              ))}
             </div>
-        ))}
-      </div>
+          )}
 
-      <div style={styles.card}>
-        <h3 style={styles.subSectionTitle}>Aptitude Alignment</h3>
-        {topCareers.map((c, i) => (
-            <div key={i} style={{...styles.alignmentRow, borderBottom: i === topCareers.length - 1 ? "none" : styles.alignmentRow.borderBottom}}>
-                <span style={{ fontWeight: "bold", color: colors.textSecondary }}>{c.career_name}</span>
-                <span style={styles.statValue}>{Math.round(c.aptitude_score ?? 0)}%</span>
+          {interestAlignment.length > 0 && (
+            <div style={styles.card}>
+              <h3 style={styles.subSectionTitle}>Interest Alignment</h3>
+              {interestAlignment.slice(0, 5).map((c, i) => (
+                <div key={i} style={{ ...styles.alignmentRow, borderBottom: i === Math.min(interestAlignment.length, 5) - 1 ? "none" : styles.alignmentRow.borderBottom }}>
+                  <span style={{ fontWeight: "bold", color: colors.textSecondary }}>{c.career_name}</span>
+                  <span style={styles.statValue}>{formatPercent(c.interest_score)}%</span>
+                </div>
+              ))}
             </div>
-        ))}
-      </div>
+          )}
+
+          {aptitudeAlignment.length > 0 && (
+            <div style={styles.card}>
+              <h3 style={styles.subSectionTitle}>Aptitude Alignment</h3>
+              {aptitudeAlignment.slice(0, 5).map((c, i) => (
+                <div key={i} style={{ ...styles.alignmentRow, borderBottom: i === Math.min(aptitudeAlignment.length, 5) - 1 ? "none" : styles.alignmentRow.borderBottom }}>
+                  <span style={{ fontWeight: "bold", color: colors.textSecondary }}>{c.career_name}</span>
+                  <span style={styles.statValue}>{formatPercent(c.aptitude_score)}%</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
 
       {/* 4. INSIGHTS */}
       <h2 style={styles.sectionTitle}>Profile Insights</h2>
-      
-      <div style={{...styles.card, borderLeft: `4px solid ${colors.primary}`}}>
-        <h3 style={styles.subSectionTitle}>Strengths</h3>
-        <ul style={styles.bulletList}>
-          {insights.strengths.map((s, i) => (
-            <li key={i} style={styles.bulletItem}>{s}</li>
-          ))}
-        </ul>
-      </div>
 
-      <div style={{...styles.card, borderLeft: '4px solid #F87171'}}>
-        <h3 style={styles.subSectionTitle}>Areas to Improve</h3>
-        <ul style={styles.bulletList}>
-          {insights.weaknesses.map((w, i) => (
-            <li key={i} style={styles.bulletItem}>{w}</li>
-          ))}
-        </ul>
-      </div>
+      {strengths.length > 0 && (
+        <div style={{ ...styles.card, borderLeft: `4px solid ${colors.primary}` }}>
+          <h3 style={styles.subSectionTitle}>Strengths</h3>
+          <ul style={styles.bulletList}>
+            {strengths.map((s, i) => (
+              <li key={i} style={styles.bulletItem}>{s}</li>
+            ))}
+          </ul>
+        </div>
+      )}
 
-      <div style={{...styles.card, borderLeft: '4px solid #818CF8'}}>
-        <h3 style={styles.subSectionTitle}>Recommendations</h3>
-        <ul style={styles.bulletList}>
-          {insights.recommendations.map((r, i) => (
-            <li key={i} style={styles.bulletItem}>{r}</li>
-          ))}
-        </ul>
-      </div>
+      {improvements.length > 0 && (
+        <div style={{ ...styles.card, borderLeft: "4px solid #F87171" }}>
+          <h3 style={styles.subSectionTitle}>Areas to Improve</h3>
+          <ul style={styles.bulletList}>
+            {improvements.map((w, i) => (
+              <li key={i} style={styles.bulletItem}>{w}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {recommendations.length > 0 && (
+        <div style={{ ...styles.card, borderLeft: "4px solid #818CF8" }}>
+          <h3 style={styles.subSectionTitle}>Recommendations</h3>
+          <ul style={styles.bulletList}>
+            {recommendations.map((r, i) => (
+              <li key={i} style={styles.bulletItem}>{r}</li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* 5. CAREER DETAILS */}
-      <h2 style={styles.sectionTitle}>Career Deep Dives</h2>
-      {topCareers.map((career, index) => {
-        const detail = details.find((d) => d.career_name === career.career_name);
-        if (!detail) return null;
+      {careerDetails && careerDetails.length > 0 && (
+        <>
+          <h2 style={styles.sectionTitle}>Career Details</h2>
+          {careerDetails.map((detail) => {
+            const career = careers.find((c: any) => c.career_id === detail.career_id || (c as any).id === detail.career_id);
+            const careerName = career ? career.career_name : "Career";
 
-        return (
-          <div key={index} style={{...styles.card}}>
-            <h3 style={styles.detailName}>{detail.career_name}</h3>
-            <p style={styles.detailDesc}>{detail.explanation}</p>
-            
-            {(detail.strengths?.length > 0) && (
-                <div style={{ marginBottom: "15px" }}>
-                  <strong style={{ fontSize: "14px", color: colors.textPrimary }}>Strengths Utilized:</strong>
-                  <ul style={{ ...styles.bulletList, marginTop: "8px" }}>
-                    {detail.strengths.map((s, i) => (
-                      <li key={i} style={styles.bulletItem}>{s}</li>
-                    ))}
-                  </ul>
-                </div>
-            )}
-            
-            {(detail.weaknesses?.length > 0) && (
-                <div>
-                  <strong style={{ fontSize: "14px", color: colors.textPrimary }}>Improvement Opportunities:</strong>
-                  <ul style={{ ...styles.bulletList, marginTop: "8px" }}>
-                    {detail.weaknesses.map((w, i) => (
-                      <li key={i} style={styles.bulletItem}>{w}</li>
-                    ))}
-                  </ul>
-                </div>
-            )}
-          </div>
-        );
-      })}
-
+            return (
+              <div key={detail.career_id} style={{ ...styles.card, marginBottom: "20px" }}>
+                <h3 style={styles.subSectionTitle}>{careerName}</h3>
+                
+                {detail.description && (
+                  <p style={{ ...styles.bulletItem, marginBottom: "12px", color: colors.textPrimary }}>
+                    {detail.description}
+                  </p>
+                )}
+                
+                {detail.strengths && detail.strengths.length > 0 && (
+                  <div style={{ marginBottom: "10px" }}>
+                    <p style={{ fontSize: "14px", fontWeight: "bold", color: colors.primary, marginBottom: "4px" }}>Strengths</p>
+                    <ul style={styles.bulletList}>
+                      {detail.strengths.map((s, i) => (
+                        <li key={i} style={styles.bulletItem}>{s}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                
+                {detail.improvements && detail.improvements.length > 0 && (
+                  <div>
+                    <p style={{ fontSize: "14px", fontWeight: "bold", color: "#F87171", marginBottom: "4px", marginTop: "10px" }}>Areas to Improve</p>
+                    <ul style={styles.bulletList}>
+                      {detail.improvements.map((imp, i) => (
+                        <li key={i} style={styles.bulletItem}>{imp}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </>
+      )}
     </div>
   );
 };

@@ -1,9 +1,10 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuthStore } from '../store/authStore';
 import { useAssessmentStore } from '../store/assessmentStore';
 import { useAlignmentStore } from '../store/alignmentStore';
 import { formatScore } from '../utils/formatScore';
-import type { CareerScore, CareerDetail, Recommendation } from '../types/alignment';
+import type { CareerScore } from '../types/alignment';
 import { generateReport } from '../pdf/generateReport';
 import { ReportTemplate } from '../pdf/reportTemplate';
 import { Button } from '../components/ui/Button';
@@ -51,6 +52,8 @@ function CareerCard({
     subScores?: { label: string; value: number }[];
     index: number;
 }) {
+    const formattedMain = formatScore(mainScore);
+
     return (
         <Card className="hover:shadow-md transition-all duration-300 mb-6 border border-gray-100 p-6 sm:p-8 space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
@@ -61,12 +64,12 @@ function CareerCard({
                     </div>
                 </div>
                 <div className="flex items-baseline gap-1 sm:text-right">
-                    <p className="text-4xl font-black text-teal-600">{formatScore(mainScore)}</p>
+                    <p className="text-4xl font-black text-teal-600">{formattedMain}</p>
                     <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">%</p>
                 </div>
             </div>
 
-            <ProgressBar value={mainScore} />
+            <ProgressBar value={formattedMain} />
 
             {subScores && subScores.length > 0 && (
                 <div className="grid grid-cols-3 gap-3 pt-6 border-t border-gray-50">
@@ -86,7 +89,7 @@ function CareerCard({
 
 export default function Results() {
     const navigate = useNavigate();
-    const { session_id } = useAssessmentStore();
+    const session_id = useAuthStore((state) => state.session_id);
     const { results, loading, error, fetchResults } = useAlignmentStore();
 
     useEffect(() => {
@@ -97,16 +100,7 @@ export default function Results() {
 
     // ── No session ──
     if (!session_id) {
-        return (
-            <Container className="flex items-center justify-center min-h-screen">
-                <Card className="text-center max-w-md w-full p-8 shadow-sm">
-                    <p className="text-gray-600 font-medium">
-                        Session not found. Please complete the assessment first.
-                    </p>
-                    <Button onClick={() => navigate("/dashboard")} className="mt-6 w-full">Back to Dashboard</Button>
-                </Card>
-            </Container>
-        );
+        return <div>Loading...</div>;
     }
 
     // ── Loading ──
@@ -153,14 +147,19 @@ export default function Results() {
     }
 
     // ── Defensive defaults ──
-    const overall = results.overall_top_10 ?? [];
-    const personality = results.personality_top_10 ?? [];
-    const interest = results.interest_top_10 ?? [];
-    const aptitude = results.aptitude_top_10 ?? [];
-    const strengths = results.insights?.strengths ?? [];
-    const weaknesses = results.insights?.weaknesses ?? [];
-    const recommendations = results.insights?.recommendations ?? [];
+    const overall = results.careers ?? [];
+    const personality = results.personality_alignment ?? [];
+    const interest = results.interest_alignment ?? [];
+    const aptitude = results.aptitude_alignment ?? [];
+    const strengths = results.strengths ?? [];
+    const weaknesses = results.improvements ?? [];
+    const recommendations = results.recommendations ?? [];
     const careerDetails = results.career_details ?? [];
+
+    // ── Safety guard: no career data yet ──
+    if (!results || !results.careers?.length) {
+        return <div>Loading results...</div>;
+    }
 
     return (
         <Container className="py-12 space-y-16 animate-in fade-in duration-1000 max-w-5xl">
@@ -306,11 +305,11 @@ export default function Results() {
                         </h4>
                         {recommendations.length === 0 ? <Empty /> : (
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                {recommendations.map((item: Recommendation, index: number) => (
+                                {recommendations.map((suggestion: string, index: number) => (
                                     <div key={`rec-${index}`} className="bg-gray-50/50 border-l-[3px] border-indigo-500 p-5 rounded-r-xl">
-                                        <p className="text-sm font-black text-gray-900 mb-2">{item.area}</p>
+                                        <p className="text-sm font-black text-gray-900 mb-2">Recommendation</p>
                                         <p className="text-sm text-gray-600 leading-relaxed font-medium">
-                                            {item.suggestion}
+                                            {suggestion}
                                         </p>
                                     </div>
                                 ))}
@@ -321,55 +320,60 @@ export default function Results() {
             </SectionWrapper>
 
             {/* 4. Career Details */}
-            <SectionWrapper 
-                title="Career Deep Dives"
-                description="Granular examination of why your profile aligns with these specific roles."
-            >
-                {careerDetails.length === 0 ? <Empty /> : (
+            {careerDetails.length > 0 && (
+                <SectionWrapper
+                    title="Career Details"
+                    description="In-depth analysis of your top career matches, including required strengths and areas for growth."
+                >
                     <div className="space-y-6">
-                        {careerDetails.map((item: CareerDetail, index: number) => (
-                            <Card key={`detail-${index}`} className="border border-gray-100 p-6 sm:p-8 space-y-6 shadow-sm hover:shadow-md transition-shadow">
-                                <h3 className="text-2xl font-black text-gray-900 tracking-tight">{item.career_name}</h3>
-                                <p className="text-gray-600 text-base leading-relaxed font-medium">{item.explanation}</p>
-
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 pt-4 border-t border-gray-50">
-                                    {(item.strengths_used ?? []).length > 0 && (
-                                        <div className="space-y-4">
-                                            <p className="text-[10px] font-black text-teal-600 uppercase tracking-widest bg-teal-50 inline-block px-3 py-1 rounded-full">
-                                                Leveraged Strengths
+                        {careerDetails.map((detail: any) => {
+                            const career = overall.find((c: any) => c.career_id === detail.career_id || c.id === detail.career_id);
+                            
+                            return (
+                                <Card key={detail.career_id} className="p-6 sm:p-8 space-y-4 shadow-sm border border-gray-100">
+                                    <h3 className="text-xl font-bold text-gray-900 mb-2">
+                                        {career?.career_name || "Career"}
+                                    </h3>
+                                    
+                                    <p className="text-sm text-gray-600 leading-relaxed font-medium mb-4">
+                                        {detail.description}
+                                    </p>
+                                    
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-gray-50">
+                                        <div>
+                                            <p className="text-sm font-bold text-teal-600 mb-2 flex items-center gap-2">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-teal-500"></span>
+                                                Strengths You Bring
                                             </p>
-                                            <ul className="space-y-2.5">
-                                                {item.strengths_used.map((s: string, i: number) => (
-                                                    <li key={`su-${index}-${i}`} className="text-sm font-medium text-gray-700 flex items-start gap-2.5">
-                                                        <span className="w-1.5 h-1.5 shrink-0 mt-1.5 bg-teal-400 rounded-full" />
+                                            <ul className="space-y-2 ml-3">
+                                                {(detail.strengths || []).map((s: string, i: number) => (
+                                                    <li key={i} className="text-sm text-gray-700 list-disc list-outside text-left">
                                                         {s}
                                                     </li>
                                                 ))}
                                             </ul>
                                         </div>
-                                    )}
-
-                                    {(item.improvement_areas ?? []).length > 0 && (
-                                        <div className="space-y-4">
-                                            <p className="text-[10px] font-black text-orange-600 uppercase tracking-widest bg-orange-50 inline-block px-3 py-1 rounded-full">
-                                                Actionable Gaps
+                                        
+                                        <div>
+                                            <p className="text-sm font-bold text-red-500 mb-2 flex items-center gap-2">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-red-400"></span>
+                                                Areas to Develop
                                             </p>
-                                            <ul className="space-y-2.5">
-                                                {item.improvement_areas.map((a: string, i: number) => (
-                                                    <li key={`ia-${index}-${i}`} className="text-sm font-medium text-gray-700 flex items-start gap-2.5">
-                                                        <span className="w-1.5 h-1.5 shrink-0 mt-1.5 bg-orange-400 rounded-full" />
-                                                        {a}
+                                            <ul className="space-y-2 ml-3">
+                                                {(detail.improvements || []).map((imp: string, i: number) => (
+                                                    <li key={i} className="text-sm text-gray-700 list-disc list-outside text-left">
+                                                        {imp}
                                                     </li>
                                                 ))}
                                             </ul>
                                         </div>
-                                    )}
-                                </div>
-                            </Card>
-                        ))}
+                                    </div>
+                                </Card>
+                            );
+                        })}
                     </div>
-                )}
-            </SectionWrapper>
+                </SectionWrapper>
+            )}
 
             {/* 5. Download Actions */}
             <SectionWrapper>
@@ -392,24 +396,14 @@ export default function Results() {
             <div className="absolute left-[-9999px] top-[-9999px] w-[800px] bg-white">
                 <div id="pdf-content">
                     <ReportTemplate
-                        careers={overall.map((c: any) => ({
-                            career_name: c.career_name,
-                            match_score: c.final_score,
-                            personality_score: c.personality_score,
-                            interest_score: c.interest_score,
-                            aptitude_score: c.aptitude_score,
-                        }))}
-                        insights={{
-                            strengths: strengths,
-                            weaknesses: weaknesses,
-                            recommendations: recommendations.map((r: any) => r.suggestion),
-                        }}
-                        details={careerDetails.map((d: any) => ({
-                            career_name: d.career_name,
-                            explanation: d.explanation,
-                            strengths: d.strengths_used ?? [],
-                            weaknesses: d.improvement_areas ?? [],
-                        }))}
+                        careers={results.careers}
+                        personalityAlignment={results.personality_alignment}
+                        interestAlignment={results.interest_alignment}
+                        aptitudeAlignment={results.aptitude_alignment}
+                        strengths={results.strengths}
+                        improvements={results.improvements}
+                        recommendations={results.recommendations}
+                        careerDetails={careerDetails}
                     />
                 </div>
             </div>

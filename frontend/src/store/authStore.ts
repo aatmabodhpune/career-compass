@@ -5,12 +5,14 @@ import type { Student } from '../types/auth';
 interface AuthState {
     student: Student | null;
     token: string | null;
+    session_id: string | null;
+    jwt: string | null;
     isAuthenticated: boolean;
-    _hasHydrated: boolean;
+    isHydrated: boolean;
     setStudent: (student: Student | null) => void;
-    setToken: (token: string | null) => void;
+    setAuth: (auth: { token: string; session_id: string; jwt: string }) => void;
     logout: () => void;
-    setHasHydrated: (state: boolean) => void;
+    setHydrated: () => void;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -18,24 +20,41 @@ export const useAuthStore = create<AuthState>()(
         (set) => ({
             student: null,
             token: null,
+            session_id: null,
+            jwt: null,
             isAuthenticated: false,
-            _hasHydrated: false,
+            isHydrated: false,
             setStudent: (student) => set({ student, isAuthenticated: !!student }),
-            setToken: (token) => set({ token, isAuthenticated: !!token }),
+            setAuth: ({ token, session_id, jwt }) =>
+                set({
+                    token,
+                    session_id,
+                    jwt,
+                    isAuthenticated: true,
+                }),
             logout: () => {
-                set({ student: null, token: null, isAuthenticated: false });
+                set({ student: null, token: null, session_id: null, jwt: null, isAuthenticated: false });
                 try {
                     localStorage.removeItem('auth-storage');
                 } catch {
                     // ignore storage errors (e.g., SSR or privacy mode)
                 }
             },
-            setHasHydrated: (state) => set({ _hasHydrated: state }),
+            setHydrated: () =>
+                set((state) => ({
+                    isHydrated: true,
+                    isAuthenticated: !!state.token && !!state.session_id && !!state.jwt,
+                })),
         }),
         {
             name: 'auth-storage',
+            partialize: (state) => ({
+                token: state.token,
+                session_id: state.session_id,
+                jwt: state.jwt,
+            }),
             onRehydrateStorage: () => (state) => {
-                state?.setHasHydrated(true);
+                state?.setHydrated();
             },
         }
     )

@@ -6,6 +6,17 @@ import_map = "./functions/auth-token-logic/deno.json"
 # Uncomment to specify a custom file path to the entrypoint.
 # Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
 entrypoint = "./functions/auth-token-logic/index.ts"
+
+[functions.compute-alignment]
+verify_jwt = false
+entrypoint = "./functions/compute-alignment/index.ts"
 # Specifies static files to be bundled with the function. Supports glob patterns.
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/auth-token-logic/*.html" ]
+
+[functions.assessment-submit]
+verify_jwt = false
+entrypoint = "./functions/assessment-submit/index.ts"
+
+[functions.assessment-save]
+verify_jwt = false

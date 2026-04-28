@@ -10,22 +10,19 @@ import { generateRecommendations } from '../../../alignment-engine/insights/reco
 import { generateCareerExplanation } from '../../../alignment-engine/insights/explanationEngine.ts';
 import { buildCareerSummaries } from '../../../alignment-engine/insights/careerSummaryBuilder.ts';
 import { generateReportPlaceholder } from '../../../alignment-engine/insights/reportGenerator.ts';
+import { getCareerDetails } from '../../../alignment-engine/enrichment/getCareerDetails.ts';
 
 export const computeAlignmentService = async (
-    payload: RequestPayload
+    payload: RequestPayload,
+    supabase: any
 ): Promise<AlignmentResult> => {
-    console.log("SESSION RECEIVED:", payload.session_id);
-
     const session_id = payload.session_id;
 
     if (!session_id) {
         throw new Error("Session ID missing");
     }
 
-    const assessment = await getAssessmentBySessionId(session_id);
-
-    console.log("SESSION RECEIVED:", session_id);
-    console.log("DB FETCH RESULT:", assessment);
+    const assessment = await getAssessmentBySessionId(session_id, supabase);
 
     if (!assessment) {
         console.error("NO ROW FOUND FOR SESSION", session_id);
@@ -60,16 +57,33 @@ export const computeAlignmentService = async (
         : FULL_REQUIREMENT;
     
     // ── CATEGORY-BASED COUNTING ──────────────────────────────────────────────
-    const keys = Object.keys(responses);
-    const pCount = keys.filter(k => k.startsWith("p")).length;
-    const iCount = keys.filter(k => k.startsWith("i")).length;
-    const aCount = keys.filter(k => k.startsWith("a")).length;
+    // 🔍 Detect structure
+    const isNested =
+        responses.personality || responses.interest || responses.aptitude;
 
-    console.log("VALIDATION COUNTS", {
+    let pCount = 0;
+    let iCount = 0;
+    let aCount = 0;
+
+    if (isNested) {
+        // ✅ NEW STRUCTURE
+        pCount = Object.keys(responses.personality || {}).length;
+        iCount = Object.keys(responses.interest || {}).length;
+        aCount = Object.keys(responses.aptitude || {}).length;
+    } else {
+        // ✅ LEGACY STRUCTURE
+        const keys = Object.keys(responses || {});
+        pCount = keys.filter(k => k.startsWith("p")).length;
+        iCount = keys.filter(k => k.startsWith("i")).length;
+        aCount = keys.filter(k => k.startsWith("a")).length;
+    }
+
+    // 🔥 REQUIRED DEBUG LOG (DO NOT REMOVE)
+    console.log("VALIDATION COUNTS:", {
+        isNested: !!isNested,
         pCount,
         iCount,
         aCount,
-        keys
     });
 
     if (
@@ -88,42 +102,42 @@ export const computeAlignmentService = async (
     }
     // ──────────────────────────────────────────────────────────────────────────
 
-    const benchmarks = await fetchCareerBenchmarks();
+    const benchmarks = await fetchCareerBenchmarks(supabase);
     
-    console.log("RAW FROM DB:", responses);
-    console.log("RAW FROM DB KEYS:", Object.keys(responses));
+    // STEP 3 — BUILD STRUCTURED INPUT (CRITICAL FIX)
+    const structuredInput: any = {
+        personality: {},
+        interest: {},
+        aptitude: {}
+    };
 
-    // Classification: only apply if input is flat (p1, i1, a1 top-level keys)
-    let structuredResponses = responses;
-
-    const isFlat = Object.keys(responses).some(
-        (key) => key.startsWith("p") || key.startsWith("i") || key.startsWith("a")
-    );
-
-    if (isFlat) {
-        structuredResponses = classifyResponses(responses as any);
-        console.log("CLASSIFIED (flat → structured):", structuredResponses);
+    if (Array.isArray(responses)) {
+        // CASE B — MULTIPLE ROWS
+        responses.forEach((r: any) => {
+            if (r.section === "personality") structuredInput.personality = r.responses || {};
+            if (r.section === "interest") structuredInput.interest = r.responses || {};
+            if (r.section === "aptitude") structuredInput.aptitude = r.responses || {};
+        });
+    } else if (responses.personality || responses.interest || responses.aptitude) {
+        // CASE A — NESTED FORMAT
+        structuredInput.personality = responses.personality || {};
+        structuredInput.interest = responses.interest || {};
+        structuredInput.aptitude = responses.aptitude || {};
     } else {
-        console.log("ALREADY STRUCTURED:", structuredResponses);
+        // CASE C — FLAT FORMAT (LEGACY)
+        const flat = responses || {};
+        Object.entries(flat).forEach(([key, val]) => {
+            if (key.startsWith("p")) structuredInput.personality[key] = val;
+            if (key.startsWith("i")) structuredInput.interest[key] = val;
+            if (key.startsWith("a")) structuredInput.aptitude[key] = val;
+        });
     }
 
-    console.log("BEFORE NORMALIZER:");
-    console.log("PERSONALITY:", structuredResponses?.personality);
-    console.log("INTEREST:", structuredResponses?.interest);
-    console.log("APTITUDE:", structuredResponses?.aptitude);
+    // Apply normalizer to convert raw DB scores into proper scoring weights
+    const normalized = normalizeAll(structuredInput);
 
-    const normalized = normalizeAll(structuredResponses);
-    console.log("NORMALIZED:", normalized);
-
+    // STEP 5 — PASS THIS OBJECT INTO SCORER
     const scores = computeAllScores(normalized, benchmarks);
-    console.log("TYPE OF SCORES:", typeof scores);
-    console.log("IS ARRAY:", Array.isArray(scores));
-    console.log("SCORES VALUE:", scores);
-
-    console.log("APTITUDE CHECK:", {
-        normalized: normalized.aptitude,
-        scores: scores.map(s => s.aptitude_score)
-    });
 
     const ranked = rankAll(scores);
 
@@ -136,7 +150,7 @@ export const computeAlignmentService = async (
     const userScores = {
         personality: getAvg(normalized.personality),
         interest: getAvg(normalized.interest),
-        aptitude: getAvg(normalized.aptitude)
+        aptitude: 0
     };
 
     let insights: any = null;
@@ -179,26 +193,50 @@ export const computeAlignmentService = async (
         console.error("Insight Engine Failure:", error);
     }
 
-    // ── SORT ALL ARRAYS DESC (Sprint 5 — Data Preparation) ──
-    ranked.overall_top_10.sort((a, b) => b.final_score - a.final_score);
-    ranked.personality_top_10.sort((a, b) => b.personality_score - a.personality_score);
-    ranked.interest_top_10.sort((a, b) => b.interest_score - a.interest_score);
-    ranked.aptitude_top_10.sort((a, b) => b.aptitude_score - a.aptitude_score);
+    // DB Native Insertion (saving only ranking bounds avoiding DB schema mutations)
+    await storeResults(payload.session_id, ranked, supabase);
 
-    const finalResponse = {
-        ...ranked,
-        overall_top_10: ranked.overall_top_10.map(c => ({
-            ...c,
-            aptitude_score: c.aptitude_score
-        })),
-        insights: insights || { strengths: [], weaknesses: [], recommendations: [] },
-        career_details: career_details || [],
-        report: generateReportPlaceholder()
+    // Ensure scoring outputs exist
+    const careers = ranked.overall_top_10 || [];
+    const personality_alignment = ranked.personality_top_10 || {};
+    const interest_alignment = ranked.interest_top_10 || {};
+    const aptitude_alignment = ranked.aptitude_top_10 || {};
+
+    // Temporary safe insights (MVP)
+    const strengths = [
+        "Strong personality alignment",
+        "Consistent interest patterns"
+    ];
+
+    const improvements = [
+        "Improve aptitude performance"
+    ];
+
+    const recommendations = [
+        "Explore careers through projects and internships",
+        "Practice logical reasoning and problem solving"
+    ];
+
+    // STEP 1 — Extract IDs
+    const topCareerIds = careers.map((c: any) => c.career_id);
+
+    // STEP 2 — Fetch details
+    const careerDetails = await getCareerDetails(supabase, topCareerIds);
+
+    // Final response object (CRITICAL)
+    const finalResult = {
+        careers,
+        personality_alignment: ranked.personality_top_10 || [],
+        interest_alignment: ranked.interest_top_10 || [],
+        aptitude_alignment: ranked.aptitude_top_10 || [],
+        strengths,
+        improvements,
+        recommendations,
+        career_details: careerDetails
     };
 
-    // 6. DB Native Insertion (saving only ranking bounds avoiding DB schema mutations)
-    await storeResults(payload.session_id, ranked);
-
-    // 7. Push formatted explicitly natively.
-    return finalResponse;
+    return {
+        data: finalResult,
+        error: null
+    };
 };

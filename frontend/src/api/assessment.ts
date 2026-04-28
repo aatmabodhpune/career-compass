@@ -1,4 +1,5 @@
 import { env } from '../config/env';
+import { useAuthStore } from '../store/authStore';
 
 /** 4. API TIMEOUT HANDLING */
 async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = 10000) {
@@ -36,39 +37,45 @@ export const assessmentApi = {
         return res.json();
     },
 
-    saveResponses: async (token: string, session_id: string, responses: any) => {
-        // Retry Logic (Only for Save Responses per Requirements)
-        let retries = 1;
-        while (retries >= 0) {
-            try {
-                const res = await fetchWithTimeout(`${env.supabaseUrl}/functions/v1/assessment-save`, {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "apikey": env.supabaseAnonKey,
-                        "Authorization": `Bearer ${env.supabaseAnonKey}`
-                    },
-                    body: JSON.stringify({ token, session_id, responses })
-                });
-                if (!res.ok) {
-                    throw new Error(`assessment-save failed with status ${res.status} ${res.statusText}`);
-                }
-                return res.json();
-            } catch (err) {
-                if (retries === 0) throw err;
-                console.warn("Retrying saveResponses after explicit timeout or network error...");
-                retries--;
-            }
+    saveResponses: async (session_id: string, responsesData: any) => {
+        const { token, jwt, session_id: storedSessionId } = useAuthStore.getState();
+        console.log("AUTH STORE AT SAVE:", { token, session_id: storedSessionId, jwt });
+        console.log("TOKEN IN SAVE:", token);
+
+        if (!jwt) {
+            throw new Error("JWT MISSING IN SAVE");
         }
+
+        const { section, responses } = responsesData;
+
+        console.log("SESSION USED IN API:", session_id);
+        const res = await fetchWithTimeout(`${env.supabaseUrl}/functions/v1/assessment-save`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "apikey": env.supabaseAnonKey,
+                "Authorization": `Bearer ${jwt}`
+            },
+            body: JSON.stringify({ session_id, section, responses })
+        });
+        if (!res.ok) {
+            throw new Error(`assessment-save failed with status ${res.status} ${res.statusText}`);
+        }
+        return res.json();
     },
 
-    submitAssessment: async (token: string, session_id: string) => {
+    submitAssessment: async (session_id: string) => {
+        console.log("SESSION USED IN API:", session_id);
+        const { token, jwt } = useAuthStore.getState();
+        if (!jwt) {
+            throw new Error("JWT MISSING IN SUBMIT");
+        }
         const res = await fetchWithTimeout(`${env.supabaseUrl}/functions/v1/assessment-submit`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
                 "apikey": env.supabaseAnonKey,
-                "Authorization": `Bearer ${env.supabaseAnonKey}`
+                "Authorization": `Bearer ${jwt}`
             },
             body: JSON.stringify({ token, session_id })
         });

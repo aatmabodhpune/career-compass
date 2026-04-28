@@ -1,9 +1,7 @@
 import { CareerScore, RankedResults } from './types.ts';
 
 export function rankOverall(scores: CareerScore[]): CareerScore[] {
-    console.log("OVERALL BEFORE SORT", scores);
     const sorted = [...scores].slice().sort((a, b) => b.final_score - a.final_score);
-    console.log("OVERALL AFTER SORT", sorted);
     return sorted.slice(0, 10);
 }
 
@@ -20,20 +18,12 @@ export function rankAptitude(scores: CareerScore[]): CareerScore[] {
 }
 
 export function rankAll(scores: CareerScore[]): RankedResults {
-    console.log("🔥 rankAll INPUT:", scores);
-    console.log("🔥 TYPE:", typeof scores);
-    console.log("🔥 IS ARRAY:", Array.isArray(scores));
-
     if (!Array.isArray(scores)) {
         throw new Error("rankAll received non-array input");
     }
 
     const rawOverall = rankOverall(scores);
-    console.log("OVERALL BEFORE SORT", rawOverall);
-
     const sortedOverall = [...rawOverall].sort((a, b) => b.final_score - a.final_score);
-    console.log("OVERALL AFTER SORT", sortedOverall);
-    console.log("🔥 NEW VERSION RUNNING - SORT FIX APPLIED");
     
     const personality_top_10 = rankPersonality(scores).slice().sort((a, b) => b.personality_score - a.personality_score);
     const interest_top_10 = rankInterest(scores).slice().sort((a, b) => b.interest_score - a.interest_score);

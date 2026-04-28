@@ -1,46 +1,23 @@
-import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { AssessmentResponses, CareerBenchmark, RankedResults } from './types.ts';
-
-let supabaseInstance: SupabaseClient | null = null;
-
-export function getSupabaseClient(): SupabaseClient {
-    if (supabaseInstance) {
-        return supabaseInstance;
-    }
-
-    const supabaseUrl = Deno.env.get("SUPABASE_URL");
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-
-    if (!supabaseUrl || !supabaseKey) {
-        throw new Error("Missing Supabase environment variables: SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
-    }
-
-    supabaseInstance = createClient(supabaseUrl, supabaseKey);
-    return supabaseInstance;
-}
 
 // Replaced unstructured classification logic permanently in favor of explicit dimensional mapping.
 
-export const getAssessmentBySessionId = async (session_id: string) => {
-    const supabase = getSupabaseClient();
+export const getAssessmentBySessionId = async (session_id: string, supabase: any) => {
     const { data, error } = await supabase
         .from("assessment_responses")
         .select("responses")
         .eq("session_id", session_id)
-        .maybeSingle();
+        .single();
 
-    if (error) {
-        console.error("DB ERROR:", error);
-        throw new Error("Failed to fetch assessment");
+    if (error || !data || !data.responses) {
+        throw new Error("No assessment responses");
     }
 
     console.log("DB FETCH RESULT:", data);
-
     return data;
 };
 
-export async function verifyAssessmentSession(session_id: string): Promise<void> {
-    const supabase = getSupabaseClient();
+export async function verifyAssessmentSession(session_id: string, supabase: any): Promise<void> {
     
     const { data: session, error } = await supabase
         .from('assessment_sessions')
@@ -53,17 +30,19 @@ export async function verifyAssessmentSession(session_id: string): Promise<void>
     }
     
     if (session.status !== "completed") {
-        const assessment = await getAssessmentBySessionId(session_id);
+        const assessment = await getAssessmentBySessionId(session_id, supabase);
 
         // Account for double-nesting if responses is stored recursively in DB
         const raw = assessment?.responses;
         const responses = raw?.responses ? raw.responses : (raw || {});
         
-        const keys = Object.keys(responses);
+        const personalityAnswers = responses.personality || {};
+        const interestAnswers = responses.interest || {};
+        const aptitudeAnswers = responses.aptitude || {};
 
-        const pCount = keys.filter(k => k.startsWith("p")).length;
-        const iCount = keys.filter(k => k.startsWith("i")).length;
-        const aCount = keys.filter(k => k.startsWith("a")).length;
+        const pCount = Object.keys(personalityAnswers).length;
+        const iCount = Object.keys(interestAnswers).length;
+        const aCount = Object.keys(aptitudeAnswers).length;
 
         const IS_TEST_MODE = true;
 
@@ -82,8 +61,7 @@ export async function verifyAssessmentSession(session_id: string): Promise<void>
     }
 }
 
-export async function fetchCareerBenchmarks(): Promise<CareerBenchmark[]> {
-    const supabase = getSupabaseClient();
+export async function fetchCareerBenchmarks(supabase: any): Promise<CareerBenchmark[]> {
     
     // Fetch active benchmarks mapping strict JSONB structures returning exactly specific parameters internally
     const { data, error } = await supabase
@@ -109,18 +87,27 @@ export async function fetchCareerBenchmarks(): Promise<CareerBenchmark[]> {
 
         const bs = row.benchmark_scores;
 
+        const normalizeTo5 = (obj: Record<string, number> | undefined) => {
+            if (!obj) return {};
+            const res: Record<string, number> = {};
+            for (const [k, v] of Object.entries(obj)) {
+                // Deterministic 0-100 to 1-5 scaling
+                res[k] = (v / 100) * 4 + 1;
+            }
+            return res;
+        };
+
         return {
             career_id: row.id,
-            personality: bs.personality,
-            interest: bs.interest,
-            aptitude: bs.aptitude,
+            personality: normalizeTo5(bs.personality),
+            interest: normalizeTo5(bs.interest),
+            aptitude: bs.aptitude, 
             weights: bs.weights
         };
     }) as CareerBenchmark[];
 }
 
-export async function storeResults(session_id: string, results: RankedResults): Promise<void> {
-    const supabase = getSupabaseClient();
+export async function storeResults(session_id: string, results: RankedResults, supabase: any): Promise<void> {
     
     // Exact schema mappings excluding structural modifications directly syncing mapped ranking constants
     const { error } = await supabase
